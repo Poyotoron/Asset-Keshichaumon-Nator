@@ -1,0 +1,18 @@
+{
+    "name": "net.maaaaa.akm.Editor",
+    "rootNamespace": "Maaaaa.Akm.Editor",
+    "references": [
+        ""
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
