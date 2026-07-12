@@ -1,0 +1,2 @@
+# Asset-Keshichaumon-Nator
+VRChat関連のUnityにおいて不要なアセットを取り除くツール
