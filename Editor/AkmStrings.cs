@@ -94,6 +94,9 @@ namespace Maaaaa.Akm.Editor
         public const string RestoreConfirmFormat =
             "{0} 件を元の場所（Assets/ 配下）へ戻します。続行しますか？";
         public const string RestoreDoneFormat = "{0} 件を復元しました。";
+        public const string RestoreFolderRemoved = "\n退避フォルダが空になったため削除しました。";
+        public const string RestoreFolderKept =
+            "\n一部が戻せなかったため、退避フォルダは残しています（残りの内容を確認してください）。";
         public const string RestoreInvalidFolder =
             "選択したフォルダに退避マッピング（.akm-relocation.json）が見つかりません。";
 

@@ -99,8 +99,10 @@ namespace Maaaaa.Akm.Editor
         }
 
         /// <summary>退避フォルダから復元する。復元件数を返す。</summary>
-        public static int Restore(string trashRootAbs)
+        /// <param name="trashFolderRemoved">全件復元し退避フォルダを削除した場合 true。</param>
+        public static int Restore(string trashRootAbs, out bool trashFolderRemoved)
         {
+            trashFolderRemoved = false;
             var manifest = ReadManifest(trashRootAbs);
             if (manifest == null) return -1; // マニフェスト無し
 
@@ -139,6 +141,13 @@ namespace Maaaaa.Akm.Editor
                     MoveMetaIfExists(absSource, absDest);
                     restored++;
                 }
+
+                // 全件戻せて、マニフェスト以外にファイルが残っていなければ退避フォルダを削除する。
+                // （残るのは退避時に作った空のディレクトリ構造とマニフェストのみ、という想定。）
+                if (restored == manifest.entries.Count && !HasRemainingFiles(trashRootAbs))
+                {
+                    trashFolderRemoved = TryDeleteTrashFolder(trashRootAbs);
+                }
             }
             finally
             {
@@ -146,6 +155,35 @@ namespace Maaaaa.Akm.Editor
                 AssetDatabase.Refresh();
             }
             return restored;
+        }
+
+        /// <summary>退避フォルダ内に、マニフェスト以外の実ファイルが残っているか。</summary>
+        private static bool HasRemainingFiles(string trashRootAbs)
+        {
+            foreach (var f in Directory.GetFiles(trashRootAbs, "*", SearchOption.AllDirectories))
+            {
+                if (!string.Equals(Path.GetFileName(f), ManifestFileName,
+                        System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static bool TryDeleteTrashFolder(string trashRootAbs)
+        {
+            try
+            {
+                Directory.Delete(trashRootAbs, true);
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning(
+                    $"[{AkmStrings.ToolName}] 退避フォルダの削除に失敗しました（手動で削除してください）: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>指定フォルダが退避フォルダ（マニフェストを持つ）か。</summary>

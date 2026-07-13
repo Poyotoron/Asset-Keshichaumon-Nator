@@ -504,14 +504,15 @@ namespace Maaaaa.Akm.Editor
                 AkmStrings.RelocateConfirmOk, AkmStrings.RelocateConfirmCancel);
             if (!ok) return;
 
-            int restored = AssetRelocator.Restore(trashRootAbs);
+            int restored = AssetRelocator.Restore(trashRootAbs, out bool trashFolderRemoved);
             if (restored < 0)
             {
                 EditorUtility.DisplayDialog(AkmStrings.ToolName, AkmStrings.RestoreInvalidFolder, AkmStrings.Ok);
                 return;
             }
-            EditorUtility.DisplayDialog(AkmStrings.ToolName,
-                string.Format(AkmStrings.RestoreDoneFormat, restored), AkmStrings.Ok);
+            var message = string.Format(AkmStrings.RestoreDoneFormat, restored)
+                + (trashFolderRemoved ? AkmStrings.RestoreFolderRemoved : AkmStrings.RestoreFolderKept);
+            EditorUtility.DisplayDialog(AkmStrings.ToolName, message, AkmStrings.Ok);
             if (_result != null) RunScan();
         }
 
