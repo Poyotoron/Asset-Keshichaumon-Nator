@@ -7,7 +7,7 @@ using Debug = UnityEngine.Debug;
 namespace Maaaaa.Akm.Editor
 {
     /// <summary>
-    /// キャッシュ掃除のライフサイクル管理（要件 §6-B.3 / F-CACHE-02 / W-8 / W-9）。
+    /// キャッシュ掃除のライフサイクル管理。
     ///   - 終了時フック（wantsToQuit / quitting）でヘルパーを detached 起動する。
     ///   - 起動時に予約フラグ・完了マーカーを検証する。
     /// EditorApplication.quitting の時点では Unity はまだ Library/ を掴んでいるため、ここで削除はしない。
@@ -24,7 +24,7 @@ namespace Maaaaa.Akm.Editor
             EditorApplication.delayCall += VerifyOnStartup;
         }
 
-        // --------------------------------------------------------- 終了時（W-8）
+        // --------------------------------------------------------- 終了時
 
         private static bool OnWantsToQuit()
         {
@@ -33,7 +33,7 @@ namespace Maaaaa.Akm.Editor
             // 即時実行モードで自ら Exit した場合は、直前に最終確認済みのため再確認しない。
             if (CacheClean.SuppressQuitPrompt) return true;
 
-            // W-8: 予約状態での終了時、再度警告し、この時点でキャンセルできるようにする。
+            // 予約状態での終了時、再度警告し、この時点でキャンセルできるようにする。
             int choice = EditorUtility.DisplayDialogComplex(
                 AkmStrings.CacheQuitWarnTitle,
                 AkmStrings.CacheQuitWarnMessage,
@@ -58,11 +58,11 @@ namespace Maaaaa.Akm.Editor
         private static void OnQuitting()
         {
             if (!CacheClean.IsReserved()) return;
-            // ここで削除してはいけない（Unity はまだ生存）。ヘルパーに委譲する（§6-B.3）。
+            // ここで削除してはいけない（Unity はまだ生存）。ヘルパーに委譲する。
             CacheClean.LaunchHelper();
         }
 
-        // --------------------------------------------------------- 起動時（W-9 / F-CACHE-06）
+        // --------------------------------------------------------- 起動時
 
         // SessionState はドメインリロードを跨いで保持され、Unity 再起動でクリアされる。
         // これにより「真の起動」と「スクリプト再コンパイルによるドメインリロード」を区別する。
@@ -94,7 +94,7 @@ namespace Maaaaa.Akm.Editor
 
         private static void HandleJustCleaned()
         {
-            // F-CACHE-06: 実測の再インポート時間。掃除直後の起動は Library 再生成が大半を占めるため、
+            // 実測の再インポート時間。掃除直後の起動は Library 再生成が大半を占めるため、
             // 「プロセス起動から現在まで」を再インポート時間の近似として記録する（環境差は UI 側で明記）。
             double measured = 0;
             try

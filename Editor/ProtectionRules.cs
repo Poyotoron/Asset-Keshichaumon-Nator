@@ -4,12 +4,12 @@ using System.Linq;
 namespace Maaaaa.Akm.Editor
 {
     /// <summary>
-    /// 保護集合（要件 §4）。ツール・シェーダー・コード資産を退避対象から除外する。
-    /// 設計原則 P-4「疑わしきは保護する」に従い、迷う場合は保護する。
+    /// 保護集合。ツール・シェーダー・コード資産を退避対象から除外する。
+    /// 判定に迷う場合は消さずに保護する方針。
     /// </summary>
     internal static class ProtectionRules
     {
-        // ---- F-PROT-01: 構造ヒューリスティック（この拡張子を含むフォルダは丸ごと保護）----
+        // ---- 構造ヒューリスティック（この拡張子を含むフォルダは丸ごと保護）----
         // .cs / .asmdef / .asmref / .dll / シェーダー系 / パッケージ定義
         public static readonly string[] StructureProtectExtensions =
         {
@@ -23,7 +23,7 @@ namespace Maaaaa.Akm.Editor
             "package.json",
         };
 
-        // ---- F-PROT-04: 常に保護する拡張子（参照解析対象外）----
+        // ---- 常に保護する拡張子（参照解析対象外）----
         public static readonly string[] AlwaysProtectedExtensions =
         {
             ".cs", ".asmdef", ".asmref", ".dll",
@@ -31,7 +31,7 @@ namespace Maaaaa.Akm.Editor
             ".json", ".txt", ".md", ".xml", ".yml", ".gitignore",
         };
 
-        // ---- F-PROT-02: 既知ツール名デフォルト保護リスト（パスに含まれれば保護）----
+        // ---- 既知ツール名デフォルト保護リスト（パスに含まれれば保護）----
         // 大文字小文字を区別せず部分一致で判定する。
         public static readonly string[] DefaultToolNames =
         {
@@ -48,7 +48,7 @@ namespace Maaaaa.Akm.Editor
             "/Plugins/", "/Gizmos/", "/Editor/",
         };
 
-        /// <summary>ファイル単位で常に保護される拡張子か（F-PROT-04）。</summary>
+        /// <summary>ファイル単位で常に保護される拡張子か。</summary>
         public static bool IsAlwaysProtectedFile(string assetPath)
         {
             return AlwaysProtectedExtensions.Contains(AkmUtil.Ext(assetPath));
@@ -75,7 +75,7 @@ namespace Maaaaa.Akm.Editor
                 return true;
             }
 
-            // F-PROT-03: ユーザーホワイトリスト（glob）
+            // ユーザーホワイトリスト（glob）
             if (whitelistGlobs != null)
             {
                 foreach (var glob in whitelistGlobs)
@@ -90,7 +90,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // F-PROT-02: 既知ツール名
+            // 既知ツール名
             var lowerUnit = unitPath.ToLowerInvariant();
             foreach (var name in DefaultToolNames)
             {
@@ -101,7 +101,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // F-PROT-01: 構造ヒューリスティック（コード・シェーダー・パッケージを含む）
+            // 構造ヒューリスティック（コード・シェーダー・パッケージを含む）
             foreach (var file in containedFiles)
             {
                 var ext = AkmUtil.Ext(file);

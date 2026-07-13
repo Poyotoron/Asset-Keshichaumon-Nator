@@ -6,11 +6,11 @@ using UnityEditor;
 namespace Maaaaa.Akm.Editor
 {
     /// <summary>
-    /// 中核アルゴリズム（要件 §2）。GC の Mark &amp; Sweep と同型。
+    /// 中核アルゴリズム。GC の Mark &amp; Sweep と同型。
     ///   ルート R  … RootCollector が返す起点
     ///   到達 M   … GetDependencies(R, recursive) の推移閉包
     ///   保護 P   … ProtectionRules
-    ///   退避候補 … 全アセット − M − P（導入単位フォルダ粒度、§5）
+    ///   退避候補 … 全アセット − M − P（導入単位フォルダ粒度）
     ///
     /// 本クラスは常に非破壊（ドライラン）。ファイル移動は AssetRelocator が担う。
     /// </summary>
@@ -20,7 +20,7 @@ namespace Maaaaa.Akm.Editor
         {
             var result = new ScanResult { RootCount = roots.AvatarRoots.Count };
 
-            // --- Mark: ルートからの到達集合（NFR-01: キャッシュ利用）---
+            // --- Mark: ルートからの到達集合（キャッシュ利用）---
             EditorUtility.DisplayProgressBar(AkmStrings.ProgressTitle, AkmStrings.ProgressBuildReachable, 0.2f);
             var reachable = DependencyCache.GetReachable(roots.AllRoots);
 
@@ -35,10 +35,10 @@ namespace Maaaaa.Akm.Editor
                 allFiles.Add(path);
             }
 
-            // --- 導入単位フォルダへ集約（§5）---
-            // ファイル単位モード（F-GRAN-03）でも、保護判定は「その導入単位フォルダの中身」を
+            // --- 導入単位フォルダへ集約 ---
+            // ファイル単位モードでも、保護判定は「そのファイルが属する導入単位フォルダの中身」を
             // 文脈として使う。これによりコード/シェーダーを含むフォルダ内の個別ファイルも保護され、
-            // 安全性（P-4）を保ったまま列挙粒度だけを細かくできる。
+            // 「迷ったら保護」の安全性を保ったまま列挙粒度だけを細かくできる。
             EditorUtility.DisplayProgressBar(AkmStrings.ProgressTitle, AkmStrings.ProgressClassify, 0.6f);
             var unitOf = new UnitResolver(settings, allFiles);
             var folderUnits = new Dictionary<string, List<string>>();
@@ -109,10 +109,10 @@ namespace Maaaaa.Akm.Editor
                     var unitPath = kv.Key;
                     var files = kv.Value;
 
-                    // 使用中: フォルダ内に到達アセットが1つでもあれば使用中（F-GRAN-01）
+                    // 使用中: フォルダ内に到達アセットが1つでもあれば使用中とみなす
                     if (files.Any(f => reachable.Contains(f))) { result.UsedUnits++; continue; }
 
-                    // 保護（§4）
+                    // 保護
                     if (ProtectionRules.IsProtectedUnit(unitPath, files, whitelist, out _))
                     {
                         result.ProtectedUnits++;
@@ -127,12 +127,12 @@ namespace Maaaaa.Akm.Editor
                         Kind = ComputeKind(files, out var kindDetail),
                         KindDetail = kindDetail,
                         Reason = AkmStrings.ReasonUnreachable,
-                        Selected = false, // 既定は全選択 OFF（§7.3）
+                        Selected = false, // 既定は全選択 OFF（明示選択させる）
                     });
                 }
             }
 
-            // サイズ降順ソートを既定（§7.3）
+            // サイズ降順ソートを既定にする
             result.Candidates.Sort((a, b) => b.SizeBytes.CompareTo(a.SizeBytes));
             return result;
         }
@@ -174,7 +174,7 @@ namespace Maaaaa.Akm.Editor
     }
 
     /// <summary>
-    /// アセットを導入単位フォルダへ対応付ける（F-GRAN-02）。
+    /// アセットを導入単位フォルダへ対応付ける。
     /// - 固定深度モード: Assets から granularityDepth 階層目のフォルダ。
     /// - 自動推定モード: 単一子フォルダの「ラッパー」を畳んだ、最も浅いコンテンツフォルダ。
     /// </summary>

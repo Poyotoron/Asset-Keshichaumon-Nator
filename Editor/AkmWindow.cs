@@ -7,7 +7,7 @@ using UnityEngine;
 namespace Maaaaa.Akm.Editor
 {
     /// <summary>
-    /// メインウィンドウ（要件 §7）。Roots / Protection / Scan Result の3セクション。
+    /// メインウィンドウ。Roots / Protection / Scan Result の3セクション。
     /// スキャンは常に非破壊。退避は明示的なボタン + 確認ダイアログでのみ実行する。
     /// </summary>
     public class AkmWindow : EditorWindow
@@ -121,7 +121,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // 個別ファイル追加（F-ROOT-03）
+            // 個別ファイル追加
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(AkmStrings.RootsAddIndividualHeader, EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(AkmStrings.RootsAddIndividualHelp, MessageType.None);
@@ -164,7 +164,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // 自動検出（F-ROOT-02）
+            // 自動検出
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(AkmStrings.RootsAutoDetectHeader, EditorStyles.boldLabel);
             if (GUILayout.Button(AkmStrings.RootsAutoDetectButton))
@@ -266,7 +266,7 @@ namespace Maaaaa.Akm.Editor
                 string.Join(" ", ProtectionRules.AlwaysProtectedExtensions),
                 EditorStyles.wordWrappedMiniLabel);
 
-            // ユーザーホワイトリスト（F-PROT-03）
+            // ユーザーホワイトリスト
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(AkmStrings.ProtWhitelistHeader, EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(AkmStrings.ProtWhitelistHelp, MessageType.None);
@@ -309,7 +309,7 @@ namespace Maaaaa.Akm.Editor
 
         private void DrawScanTab()
         {
-            // 判定粒度設定（F-GRAN-02）
+            // 判定粒度設定
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUI.BeginChangeCheck();
@@ -324,7 +324,7 @@ namespace Maaaaa.Akm.Editor
                 if (EditorGUI.EndChangeCheck()) _settings.Save();
             }
 
-            // ファイル単位モード（F-GRAN-03）
+            // ファイル単位モード
             EditorGUI.BeginChangeCheck();
             _settings.fileUnitMode = EditorGUILayout.ToggleLeft(
                 AkmStrings.ScanFileUnitToggle, _settings.fileUnitMode);
@@ -368,7 +368,7 @@ namespace Maaaaa.Akm.Editor
                     AkmStrings.ProgressTitle, AkmStrings.ProgressCollectRoots, 0.05f);
                 var roots = RootCollector.Collect(_settings);
 
-                // F-ROOT-05: ルート未設定ガード
+                // ルート未設定ガード
                 if (roots.HasNoAvatarRoots)
                 {
                     _scanBlocked = true;
@@ -440,7 +440,7 @@ namespace Maaaaa.Akm.Editor
 
                     if (GUILayout.Button(AkmStrings.ScanProtectButton, GUILayout.Width(90)))
                     {
-                        // このフォルダをホワイトリストに追加（§4.3 ワンクリック）
+                        // このフォルダをホワイトリストにワンクリックで追加
                         AddWhitelistGlob(e.UnitPath + "/**");
                         AddWhitelistGlob(e.UnitPath);
                         RunScan();
@@ -456,7 +456,7 @@ namespace Maaaaa.Akm.Editor
             EditorGUILayout.LabelField(string.Format(
                 AkmStrings.ScanSelectedSummaryFormat, selected.Count, AkmUtil.HumanSize(selectedSize)));
 
-            // F-DEL-03: 退避前 .unitypackage バックアップ
+            // 退避前 .unitypackage バックアップ
             EditorGUI.BeginChangeCheck();
             _settings.exportUnityPackageBeforeRelocate = EditorGUILayout.ToggleLeft(
                 AkmStrings.RelocateExportPackageToggle, _settings.exportUnityPackageBeforeRelocate);
@@ -486,7 +486,7 @@ namespace Maaaaa.Akm.Editor
                 return;
             }
 
-            // 確認ダイアログ（§7.4）。既定フォーカスはキャンセル。
+            // 確認ダイアログ。既定フォーカスはキャンセル。
             bool ok = EditorUtility.DisplayDialog(
                 AkmStrings.RelocateConfirmTitle,
                 string.Format(AkmStrings.RelocateConfirmFormat, selected.Count, AkmUtil.HumanSize(selectedSize)),
@@ -498,7 +498,7 @@ namespace Maaaaa.Akm.Editor
                 selected, _settings.exportUnityPackageBeforeRelocate,
                 out int moved, out string exportedPackage);
 
-            // 実行後ガイダンス（§7.5）
+            // 実行後ガイダンス
             var doneMsg = string.Format(AkmStrings.RelocateDoneFormat, moved, trashRoot);
             if (!string.IsNullOrEmpty(exportedPackage))
                 doneMsg += string.Format(AkmStrings.RelocateExportedFormat, exportedPackage);
@@ -565,7 +565,7 @@ namespace Maaaaa.Akm.Editor
             catch { return 0; }
         }
 
-        // -------------------------------------------------- 完全削除（F-DEL-04）
+        // -------------------------------------------------- 完全削除
 
         private void DrawPurgeSection()
         {
@@ -676,7 +676,7 @@ namespace Maaaaa.Akm.Editor
             }
         }
 
-        // -------------------------------------------------- キャッシュ掃除（§6-B / F-CACHE）
+        // -------------------------------------------------- キャッシュ掃除
 
         private void DrawCacheTab()
         {
@@ -690,10 +690,10 @@ namespace Maaaaa.Akm.Editor
             }
 
             EditorGUILayout.HelpBox(AkmStrings.CacheIntro, MessageType.None);
-            // W-1 / W-10
+            // 目立つ警告
             EditorGUILayout.HelpBox(AkmStrings.CacheWarnMain, MessageType.Warning);
 
-            // 予約中の表示（W-8 導線）
+            // 予約中の表示
             if (CacheClean.IsReserved())
             {
                 var pending = CacheClean.ReadPending();
@@ -706,7 +706,7 @@ namespace Maaaaa.Akm.Editor
                 EditorGUILayout.Space();
             }
 
-            // Logs を含めるか（F-CACHE-01）
+            // Logs を含めるか
             EditorGUI.BeginChangeCheck();
             _settings.cacheCleanIncludeLogs = EditorGUILayout.ToggleLeft(
                 AkmStrings.CacheIncludeLogsToggle, _settings.cacheCleanIncludeLogs);
@@ -722,7 +722,7 @@ namespace Maaaaa.Akm.Editor
                 MeasureCache();
             }
 
-            // W-2: 数値の根拠
+            // 数値の根拠
             if (_cacheMeasured)
             {
                 EditorGUILayout.HelpBox(string.Format(
@@ -731,7 +731,7 @@ namespace Maaaaa.Akm.Editor
                     _cacheAssetCount,
                     AkmUtil.HumanSize(_cacheAssetSize)), MessageType.Info);
 
-                // W-4: 削除対象を全件列挙
+                // 削除対象を全件列挙
                 EditorGUILayout.LabelField(AkmStrings.CacheTargetsHeader, EditorStyles.boldLabel);
                 foreach (var t in _cacheTargets.Where(t => t.Enabled))
                 {
@@ -743,7 +743,7 @@ namespace Maaaaa.Akm.Editor
                 EditorGUILayout.LabelField(AkmStrings.CacheTargetsCsprojNote, EditorStyles.miniLabel);
             }
 
-            // W-3: 所要時間の目安（実測優先）
+            // 所要時間の目安（実測優先）
             EditorGUILayout.Space();
             if (_settings.lastReimportSeconds > 0)
             {
@@ -752,7 +752,7 @@ namespace Maaaaa.Akm.Editor
                     AkmUtil.HumanDuration(_settings.lastReimportSeconds)), MessageType.Info);
             }
             EditorGUILayout.HelpBox(AkmStrings.CacheTimeEstimateGeneric, MessageType.None);
-            // W-7: 実行タイミング助言
+            // 実行タイミング助言
             EditorGUILayout.HelpBox(AkmStrings.CacheTimingAdvice, MessageType.None);
 
             // 実行導線（二段階確認は専用ウィンドウ）
@@ -769,7 +769,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // フォールバック（F-CACHE-04）
+            // フォールバック
             EditorGUILayout.Space();
             using (new EditorGUI.DisabledScope(!_cacheMeasured))
             {

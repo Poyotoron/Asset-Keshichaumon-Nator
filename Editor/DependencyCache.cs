@@ -6,7 +6,7 @@ using UnityEditor;
 namespace Maaaaa.Akm.Editor
 {
     /// <summary>
-    /// 依存グラフ（到達集合）のキャッシュ（要件 NFR-01）。
+    /// 依存グラフ（到達集合）のキャッシュ。
     /// GetDependencies は数万アセットで重いため、同一ルート集合での2回目以降は再利用する。
     /// アセットの変更（インポート・削除・移動）を AssetPostprocessor で検知してキャッシュを無効化する。
     ///

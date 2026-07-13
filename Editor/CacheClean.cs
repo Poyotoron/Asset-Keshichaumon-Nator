@@ -11,9 +11,9 @@ using Debug = UnityEngine.Debug;
 namespace Maaaaa.Akm.Editor
 {
     /// <summary>
-    /// ビルドキャッシュ掃除の中核（要件 §6-B / §7.6 / F-CACHE-01〜06）。
+    /// ビルドキャッシュ掃除の中核。
     ///
-    /// 重要な制約（要件 §6-B.3）:
+    /// 重要な制約:
     ///   Unity 実行中は Library/ / Temp/ がロックされ、Unity プロセス内から削除するとクラッシュする。
     ///   EditorApplication.quitting の時点でも Unity は生きているため削除できない。
     ///   したがって「予約 → 終了時に外部ヘルパープロセスを detached 起動 → ヘルパーが PID 終了を待って削除」
@@ -23,7 +23,7 @@ namespace Maaaaa.Akm.Editor
     /// </summary>
     internal static class CacheClean
     {
-        // ---- .akm/ 配下のフラグ / ログ（Library・Assets の外に置く。§6-B F-CACHE-02）----
+        // ---- .akm/ 配下のフラグ / ログ（Library・Assets の外に置く）----
         public const string AkmDirName = ".akm";
         public const string PendingFileName = "pending-clean.json";
         public const string DoneFileName = "clean-done.json";
@@ -34,7 +34,7 @@ namespace Maaaaa.Akm.Editor
         public const int HelperTimeoutSeconds = 120;
 
         /// <summary>
-        /// 即時実行（今すぐ終了して掃除）で自ら Exit する場合に、終了時ダイアログ（W-8）の
+        /// 即時実行（今すぐ終了して掃除）で自ら Exit する場合に、終了時の確認ダイアログの
         /// 二重表示を避けるためのフラグ。ユーザーは直前に最終確認済みのため。
         /// </summary>
         public static bool SuppressQuitPrompt = false;
@@ -60,7 +60,7 @@ namespace Maaaaa.Akm.Editor
             if (!Directory.Exists(AkmDir)) Directory.CreateDirectory(AkmDir);
         }
 
-        // ------------------------------------------------------------ 削除対象（W-4）
+        // ------------------------------------------------------------ 削除対象
 
         /// <summary>削除対象1件（フォルダ）。</summary>
         internal class CacheTarget
@@ -74,7 +74,7 @@ namespace Maaaaa.Akm.Editor
 
         /// <summary>
         /// 掃除対象フォルダを列挙する（存在するもののみ）。Logs は設定に応じて。
-        /// Assets/ Packages/ ProjectSettings/ は絶対に含めない（§6-B.2）。
+        /// Assets/ Packages/ ProjectSettings/ は絶対に含めない。
         /// </summary>
         public static List<CacheTarget> EnumerateTargets(AkmSettings settings)
         {
@@ -124,14 +124,14 @@ namespace Maaaaa.Akm.Editor
             }
         }
 
-        /// <summary>Library/ の実測サイズ（W-2）。</summary>
+        /// <summary>Library/ の実測サイズ。</summary>
         public static long MeasureLibrarySize()
         {
             var abs = AkmUtil.Normalize(Path.Combine(AkmUtil.ProjectRoot, "Library"));
             return AkmUtil.DirectorySize(abs);
         }
 
-        /// <summary>Assets/ 配下のアセット数と合計サイズ（W-2）。</summary>
+        /// <summary>Assets/ 配下のアセット数と合計サイズ。</summary>
         public static void MeasureAssets(out int count, out long totalBytes)
         {
             count = 0;
@@ -187,7 +187,7 @@ namespace Maaaaa.Akm.Editor
             catch (Exception ex) { Debug.LogWarning($"[{AkmStrings.ToolName}] 予約解除に失敗: {ex.Message}"); }
         }
 
-        // ------------------------------------------------------------ 完了マーカー（W-9 / F-CACHE-06）
+        // ------------------------------------------------------------ 完了マーカー
 
         [Serializable]
         internal class CleanDone
@@ -303,7 +303,7 @@ namespace Maaaaa.Akm.Editor
 
         private static string PsEscape(string s) => s?.Replace("'", "''");
 
-        // ------------------------------------------------------------ フォールバック（F-CACHE-04）
+        // ------------------------------------------------------------ フォールバック
 
         /// <summary>
         /// clean-cache.bat をプロジェクトルートに生成する。Unity を終了してから手動実行するためのフォールバック。

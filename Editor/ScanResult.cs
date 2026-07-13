@@ -30,10 +30,10 @@ namespace Maaaaa.Akm.Editor
         /// <summary>種別の内訳（例: "Model 1, Material 3, Texture 12"）。ツールチップ表示用。</summary>
         public string KindDetail;
 
-        /// <summary>判定根拠（P-2）。</summary>
+        /// <summary>判定根拠（なぜ未使用と判断したか。UI に表示する）。</summary>
         public string Reason;
 
-        /// <summary>UI 選択状態（既定 false = 明示選択させる、§7.3）。</summary>
+        /// <summary>UI 選択状態（既定 false = 明示選択させる）。</summary>
         public bool Selected;
     }
 

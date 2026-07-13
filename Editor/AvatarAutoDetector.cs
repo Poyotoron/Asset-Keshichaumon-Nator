@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Maaaaa.Akm.Editor
 {
     /// <summary>
-    /// VRCAvatarDescriptor を持つ Prefab を検索する（F-ROOT-02）。
+    /// VRCAvatarDescriptor を持つ Prefab を検索する（アバターの自動検出）。
     ///
     /// VRChat SDK への「コンパイル時」の依存を避けるため、型はリフレクションで解決する。
     /// これにより asmdef に SDK 参照が無くてもコンパイルが通り、SDK 未導入環境でも壊れない。

@@ -39,7 +39,7 @@ namespace Maaaaa.Akm.Editor
         public const string ProtHeader = "保護ルール";
         public const string ProtHelp =
             "以下に該当するフォルダ／ファイルは、参照されていなくても退避対象から除外されます。\n" +
-            "設計原則 P-4「疑わしきは保護する」に基づき、迷う場合は保護側に倒します。";
+            "判定に迷う場合は、誤って消してしまわないよう保護側に倒します。";
         public const string ProtStructureHeader = "構造ヒューリスティック保護（自動）";
         public const string ProtToolListHeader = "既知ツール名リスト（デフォルト保護）";
         public const string ProtExtHeader = "常に保護する拡張子";
@@ -117,14 +117,14 @@ namespace Maaaaa.Akm.Editor
         public const string Ok = "OK";
         public const string Cancel = "キャンセル";
 
-        // ---- 退避オプション（Phase 2） ----
-        public const string RelocateExportPackageToggle = "退避前に .unitypackage としてバックアップする（F-DEL-03）";
+        // ---- 退避オプション ----
+        public const string RelocateExportPackageToggle = "退避前に .unitypackage としてバックアップする";
         public const string RelocateExportPackageHelp =
             "退避対象を .unitypackage として書き出してから退避します。復元とは別の、もう一段の安全網です。\n" +
             "書き出し先はプロジェクトルート直下の退避フォルダ内（_UnusedAssets_…/backup.unitypackage）です。";
         public const string RelocateExportedFormat = "\n.unitypackage を書き出しました:\n{0}";
 
-        // ---- 完全削除（F-DEL-04） ----
+        // ---- 完全削除 ----
         public const string PurgeHeader = "退避フォルダの完全削除（取り消し不可）";
         public const string PurgeHelp =
             "退避フォルダ（_UnusedAssets_…）を完全に削除します。この操作は取り消せません。\n" +
@@ -145,7 +145,7 @@ namespace Maaaaa.Akm.Editor
             "安全のため、退避フォルダ以外は完全削除できません。";
         public const string PurgeFailedFormat = "削除に失敗しました: {0}";
 
-        // ---- ファイル単位モード（F-GRAN-03） ----
+        // ---- ファイル単位モード ----
         public const string ScanFileUnitToggle = "ファイル単位モード（上級者向け）";
         public const string ScanFileUnitHelp =
             "フォルダ集約を無効化し、アセットを1ファイルずつ列挙します。\n" +
@@ -158,7 +158,7 @@ namespace Maaaaa.Akm.Editor
             "Assets/ 配下を SHA-256 で照合し、内容が完全に一致するファイル群を検出します。\n" +
             "共通基盤（シェーダー・テクスチャ等）を複数の配布物が同梱している場合などに見つかります。\n" +
             "これは検出（レポート）のみで、自動では何も移動・削除しません。参照されている重複を消すと壊れるため、\n" +
-            "内容を確認したうえで手動判断してください（設計原則 P-4）。";
+            "内容を確認したうえで手動で判断してください。";
         public const string DupScanButton = "重複を検出（非破壊）";
         public const string DupNotRunYet = "まだ検出していません。「重複を検出」を押してください。";
         public const string DupEmpty = "内容が重複するファイルは見つかりませんでした。";
@@ -169,7 +169,7 @@ namespace Maaaaa.Akm.Editor
         public const string DupUsedYes = "使用中";
         public const string DupUsedNo = "未参照";
 
-        // ---- キャッシュ掃除（§6-B / F-CACHE） ----
+        // ---- キャッシュ掃除 ----
         public const string CacheHeader = "ビルドキャッシュ（Library / Temp）の掃除";
         public const string CacheWindowsOnly =
             "この機能は現在 Windows のみ対応です。この環境では利用できません。";
@@ -177,26 +177,26 @@ namespace Maaaaa.Akm.Editor
             "Assets/ からアセットを退避しても Library/ 配下のキャッシュは縮みません。ここを全削除すると\n" +
             "ディスク容量を大きく取り戻せる場合があります。ただし次回 Unity 起動時に全アセットの再インポートが\n" +
             "発生します。";
-        // W-1 / W-10: 過小表現を避け、目立つ警告
+        // 過小表現を避け、目立つ警告として出す
         public const string CacheWarnMain =
             "⚠ 次回 Unity 起動時に、全アセットの再インポートが発生します。\n" +
             "プロジェクト規模により 数分〜数十分（それ以上になることもあります）かかります。\n" +
             "失うのはデータではなく「時間」です。「一瞬で終わる」「安全」といった軽い操作ではありません。";
-        // W-2: 数値の根拠
+        // 見積りの根拠を数値で示す
         public const string CacheStatsFormat =
             "あなたのプロジェクトの規模:\n" +
             "・現在の Library/ サイズ: {0}\n" +
             "・Assets/ のアセット数: {1} 個 / 合計 {2}";
-        // W-3: 所要時間の目安（断定しない）
+        // 所要時間の目安（環境差が大きいので断定しない）
         public const string CacheTimeEstimateGeneric =
             "所要時間の目安: 環境（CPU / ストレージ / アセット構成）で大きく変わるため断定できません。\n" +
             "SSD でも数分、規模が大きい・HDD の場合は数十分以上かかることがあります。";
         public const string CacheTimeEstimateMeasuredFormat =
             "前回このプロジェクトでは、掃除後の起動に約 {0} かかりました（実測値）。";
-        // W-7: 実行タイミング助言
+        // 実行タイミングの助言
         public const string CacheTimingAdvice =
             "推奨タイミング: 作業終了時、離席前、就寝前など、しばらく Unity を使わないときに実行してください。";
-        // W-4: 削除対象
+        // 削除対象（全件を列挙して見せる）
         public const string CacheTargetsHeader = "削除対象（全件）";
         public const string CacheMeasureButton = "サイズを計測 / 更新";
         public const string CacheReserveButton = "次回 Unity 終了時にキャッシュを掃除する（予約）…";
@@ -212,7 +212,7 @@ namespace Maaaaa.Akm.Editor
             "clean-cache.bat をプロジェクトルートに生成しました:\n{0}\n\n" +
             "Unity を完全に終了してから、このバッチをダブルクリックで実行してください。";
 
-        // 予約ダイアログ（W-5 第1段階 / 第2段階は専用ウィンドウ）
+        // 予約ダイアログ（第1段階 / 第2段階は専用ウィンドウ）
         public const string CacheConfirmStage2Title = "キャッシュ掃除の最終確認";
         public const string CacheAckCheckbox = "再インポートに時間がかかることを理解しました";
         public const string CacheReserveConfirmButton = "予約する";
@@ -220,7 +220,7 @@ namespace Maaaaa.Akm.Editor
         public const string CacheReservedDialogFormat =
             "キャッシュ掃除を予約しました。\n次回 Unity を終了したときに、外部ヘルパーが Library/ 等を削除します。\n\n{0}";
 
-        // W-8: 終了時の再警告
+        // 終了時の再警告
         public const string CacheQuitWarnTitle = "キャッシュ掃除が予約されています";
         public const string CacheQuitWarnMessage =
             "キャッシュ掃除が予約されています。\n" +
@@ -230,7 +230,7 @@ namespace Maaaaa.Akm.Editor
         public const string CacheQuitCancelReservation = "予約を取り消して終了";
         public const string CacheQuitAbort = "終了しない";
 
-        // W-9: 起動時の再インポート通知
+        // 起動時の再インポート通知
         public const string CacheJustCleanedTitle = "キャッシュを掃除しました";
         public const string CacheJustCleanedMessage =
             "前回終了時にビルドキャッシュを削除しました。\n" +

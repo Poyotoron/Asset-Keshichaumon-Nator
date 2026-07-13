@@ -29,11 +29,11 @@ namespace Maaaaa.Akm.Editor
     }
 
     /// <summary>
-    /// 退避（F-DEL-01）と復元（F-DEL-02）。破壊的操作を担う。
+    /// 退避と復元。破壊的操作を担う。
     /// - 退避先は ProjectRoot 直下 _UnusedAssets_yyyyMMdd_HHmmss（Assets 外＝再インポート対象外）。
     /// - .meta を必ず同伴して GUID を保持する。
     /// - 移動マッピングを退避フォルダ内 JSON に記録し、復元を可能にする。
-    /// この操作は削除ではなく「移動」であり、常に可逆（設計原則 P-1）。
+    /// この操作は削除ではなく「移動」であり、常に可逆（元に戻せる）。
     /// </summary>
     internal static class AssetRelocator
     {
@@ -48,7 +48,7 @@ namespace Maaaaa.Akm.Editor
         }
 
         /// <summary>
-        /// 退避を実行する（F-DEL-01）。exportPackage=true なら移動前に .unitypackage を書き出す（F-DEL-03）。
+        /// 退避を実行する。exportPackage=true なら移動前に .unitypackage を書き出す。
         /// </summary>
         /// <param name="exportedPackagePath">書き出した .unitypackage の絶対パス（未書き出しは null）。</param>
         public static string Relocate(
@@ -61,7 +61,7 @@ namespace Maaaaa.Akm.Editor
             var trashRoot = AkmUtil.Normalize(Path.Combine(AkmUtil.ProjectRoot, TrashPrefix + timestamp));
             Directory.CreateDirectory(trashRoot);
 
-            // F-DEL-03: 移動前（アセットがまだ Assets/ にある間）に .unitypackage を書き出す。
+            // 移動前（アセットがまだ Assets/ にある間）に .unitypackage を書き出す。
             if (exportPackage)
             {
                 exportedPackagePath = ExportBackup(targets, trashRoot);
@@ -213,7 +213,7 @@ namespace Maaaaa.Akm.Editor
         }
 
         /// <summary>
-        /// F-DEL-03: 退避対象を .unitypackage としてエクスポートする。書き出したパスを返す（失敗時 null）。
+        /// 退避対象を .unitypackage としてエクスポートする。書き出したパスを返す（失敗時 null）。
         /// 依存は含めず（IncludeDependencies を使わない）、退避する範囲のみを再帰的に含める。
         /// </summary>
         private static string ExportBackup(IReadOnlyList<ScanResultEntry> targets, string trashRoot)
@@ -254,7 +254,7 @@ namespace Maaaaa.Akm.Editor
         }
 
         /// <summary>
-        /// F-DEL-04: 退避フォルダを完全に削除する（取り消し不可）。
+        /// 退避フォルダを完全に削除する（取り消し不可）。
         /// 安全のため、本ツールの退避フォルダ（マニフェストを持つ）以外は削除を拒否する。
         /// </summary>
         public static bool PurgeTrashFolder(string trashRootAbs, out string error)
