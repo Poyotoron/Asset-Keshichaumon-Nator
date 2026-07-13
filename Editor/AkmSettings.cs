@@ -30,7 +30,7 @@ namespace Maaaaa.Akm.Editor
         public int granularityDepth = 2;
 
         [Tooltip("最も浅いコンテンツフォルダを自動推定する（深度指定を無視）")]
-        public bool autoEstimateGranularity = false;
+        public bool autoEstimateGranularity = true;
 
         [Tooltip("前回スキャン日時")]
         public string lastScanTime = "";
