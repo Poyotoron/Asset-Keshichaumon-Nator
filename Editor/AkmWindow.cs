@@ -411,7 +411,7 @@ namespace Maaaaa.Akm.Editor
                     }
 
                     GUILayout.Label(AkmUtil.HumanSize(e.SizeBytes), GUILayout.Width(80));
-                    GUILayout.Label(AkmUtil.KindLabel(e.Kind), GUILayout.Width(80));
+                    GUILayout.Label(new GUIContent(AkmUtil.KindLabel(e.Kind), e.KindDetail), GUILayout.Width(80));
                     GUILayout.Label(e.Reason, GUILayout.Width(140));
 
                     if (GUILayout.Button(AkmStrings.ScanProtectButton, GUILayout.Width(90)))

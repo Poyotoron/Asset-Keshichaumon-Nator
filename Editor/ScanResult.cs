@@ -27,6 +27,9 @@ namespace Maaaaa.Akm.Editor
         /// <summary>代表種別。</summary>
         public AssetKind Kind;
 
+        /// <summary>種別の内訳（例: "Model 1, Material 3, Texture 12"）。ツールチップ表示用。</summary>
+        public string KindDetail;
+
         /// <summary>判定根拠（P-2）。</summary>
         public string Reason;
 

@@ -89,7 +89,8 @@ namespace Maaaaa.Akm.Editor
                     UnitPath = unitPath,
                     ContainedFiles = files,
                     SizeBytes = files.Sum(AkmUtil.FileSize),
-                    Kind = DominantKind(files),
+                    Kind = ComputeKind(files, out var kindDetail),
+                    KindDetail = kindDetail,
                     Reason = AkmStrings.ReasonUnreachable,
                     Selected = false, // 既定は全選択 OFF（§7.3）
                 };
@@ -101,22 +102,39 @@ namespace Maaaaa.Akm.Editor
             return result;
         }
 
-        private static AssetKind DominantKind(List<string> files)
+        // 内訳表示の並び順
+        private static readonly AssetKind[] KindDetailOrder =
         {
-            var kinds = files
-                .Select(AkmUtil.ClassifyKind)
-                .Where(k => k != AssetKind.Other)
-                .ToList();
-            if (kinds.Count == 0) return AssetKind.Other;
-            var distinct = kinds.Distinct().ToList();
-            if (distinct.Count == 1) return distinct[0];
+            AssetKind.Model, AssetKind.Texture, AssetKind.Material, AssetKind.Animation,
+        };
 
-            // 最頻の種別を代表にする。複数拮抗なら Mixed。
-            var top = kinds.GroupBy(k => k)
-                .OrderByDescending(g => g.Count())
-                .ToList();
-            if (top.Count >= 2 && top[0].Count() == top[1].Count()) return AssetKind.Mixed;
-            return top[0].Key;
+        /// <summary>
+        /// フォルダの代表種別を決める。意味のある種別（Model/Texture/Material/Animation）が
+        /// 2 種類以上含まれていれば「混在」とする。単一種類ならその種別、無ければ「その他」。
+        /// あわせて内訳文字列（"Model 1, Texture 12" 等）を返す。
+        /// </summary>
+        private static AssetKind ComputeKind(List<string> files, out string detail)
+        {
+            var counts = new Dictionary<AssetKind, int>();
+            foreach (var f in files)
+            {
+                var k = AkmUtil.ClassifyKind(f);
+                if (k == AssetKind.Other) continue;
+                counts[k] = counts.TryGetValue(k, out var c) ? c + 1 : 1;
+            }
+
+            if (counts.Count == 0)
+            {
+                detail = AkmUtil.KindLabel(AssetKind.Other);
+                return AssetKind.Other;
+            }
+
+            detail = string.Join(", ", KindDetailOrder
+                .Where(counts.ContainsKey)
+                .Select(k => $"{AkmUtil.KindLabel(k)} {counts[k]}"));
+
+            // 2 種類以上の意味のある種別が混ざっていれば「混在」
+            return counts.Count >= 2 ? AssetKind.Mixed : counts.Keys.First();
         }
     }
 
