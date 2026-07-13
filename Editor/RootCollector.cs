@@ -5,13 +5,13 @@ using UnityEditor;
 
 namespace Maaaaa.Akm.Editor
 {
-    /// <summary>ルート集合の収集結果（要件 §3）。</summary>
+    /// <summary>ルート集合の収集結果。</summary>
     internal class RootSet
     {
         /// <summary>依存グラフの起点にする全アセットパス（アバター系 + 暗黙ルート）。</summary>
         public readonly List<string> AllRoots = new List<string>();
 
-        /// <summary>アバター Prefab / Scene 由来のルート（F-ROOT-05 のガード判定に使う）。</summary>
+        /// <summary>アバター Prefab / Scene 由来のルート（空ルートのガード判定に使う）。</summary>
         public readonly List<string> AvatarRoots = new List<string>();
 
         /// <summary>暗黙ルート（Resources 等）由来のルート。</summary>
@@ -20,16 +20,16 @@ namespace Maaaaa.Akm.Editor
         /// <summary>収集中に出たメッセージ（UI 表示用）。</summary>
         public readonly List<string> Messages = new List<string>();
 
-        /// <summary>アバターの起点が1つも無い＝スキャンをブロックすべき状態（F-ROOT-05）。</summary>
+        /// <summary>アバターの起点が1つも無い＝スキャンをブロックすべき状態。</summary>
         public bool HasNoAvatarRoots => AvatarRoots.Count == 0;
     }
 
     /// <summary>
-    /// ルート集合の決定（要件 §3）。取りこぼすと使用中アセットを誤判定するため最重要。
+    /// ルート集合の決定。取りこぼすと使用中アセットを誤判定するため最重要。
     /// </summary>
     internal static class RootCollector
     {
-        // 暗黙ルートとみなす特殊フォルダ名（F-ROOT-04）
+        // 暗黙ルートとみなす特殊フォルダ名
         private static readonly string[] ImplicitFolderMarkers =
         {
             "/Resources/",
@@ -43,7 +43,7 @@ namespace Maaaaa.Akm.Editor
             var avatar = new HashSet<string>();
             var implicitRoots = new HashSet<string>();
 
-            // --- F-ROOT-01: アバタールートディレクトリを再帰走査して .prefab / .unity を採用 ---
+            // --- アバタールートディレクトリを再帰走査して .prefab / .unity を採用 ---
             foreach (var dir in settings.avatarRootDirectories.Where(d => !string.IsNullOrEmpty(d)))
             {
                 if (!AssetDatabase.IsValidFolder(dir))
@@ -57,7 +57,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // --- F-ROOT-03: 個別ファイル指定 ---
+            // --- 個別ファイル指定 ---
             foreach (var p in settings.additionalRootAssets.Where(a => !string.IsNullOrEmpty(a)))
             {
                 var ext = AkmUtil.Ext(p);
@@ -67,7 +67,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // --- F-ROOT-02: 自動検出（除外されていないもの）---
+            // --- 自動検出（除外されていないもの）---
             var excluded = new HashSet<string>(settings.excludedAutoDetectedRoots ?? new List<string>());
             foreach (var p in AvatarAutoDetector.FindAvatarPrefabs())
             {
@@ -83,7 +83,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // --- F-ROOT-04: 暗黙ルート ---
+            // --- 暗黙ルート ---
             CollectImplicitRoots(implicitRoots);
 
             set.AvatarRoots.AddRange(avatar.OrderBy(x => x));

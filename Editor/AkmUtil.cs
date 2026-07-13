@@ -46,6 +46,40 @@ namespace Maaaaa.Akm.Editor
             return i == 0 ? $"{(long)v} {units[i]}" : $"{v:0.##} {units[i]}";
         }
 
+        /// <summary>人間可読な所要時間表記（秒 → 「約 X 分 Y 秒」等）。</summary>
+        public static string HumanDuration(double seconds)
+        {
+            if (seconds < 0) return "-";
+            if (seconds < 60) return $"{seconds:0} 秒";
+            int totalSec = (int)System.Math.Round(seconds);
+            int min = totalSec / 60;
+            int sec = totalSec % 60;
+            if (min < 60) return sec == 0 ? $"{min} 分" : $"{min} 分 {sec} 秒";
+            int hour = min / 60;
+            min %= 60;
+            return min == 0 ? $"{hour} 時間" : $"{hour} 時間 {min} 分";
+        }
+
+        /// <summary>ディレクトリ配下の合計バイト数（再帰）。存在しなければ 0。</summary>
+        public static long DirectorySize(string absDir)
+        {
+            try
+            {
+                if (!Directory.Exists(absDir)) return 0;
+                long sum = 0;
+                foreach (var f in Directory.EnumerateFiles(absDir, "*", SearchOption.AllDirectories))
+                {
+                    try { sum += new FileInfo(f).Length; }
+                    catch { /* アクセス不可 / ロック中は無視 */ }
+                }
+                return sum;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
         /// <summary>アセットファイル1つの実サイズ（.meta は含めない）。</summary>
         public static long FileSize(string assetPath)
         {

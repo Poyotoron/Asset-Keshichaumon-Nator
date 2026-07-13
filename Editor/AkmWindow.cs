@@ -7,12 +7,12 @@ using UnityEngine;
 namespace Maaaaa.Akm.Editor
 {
     /// <summary>
-    /// メインウィンドウ（要件 §7）。Roots / Protection / Scan Result の3セクション。
+    /// メインウィンドウ。Roots / Protection / Scan Result の3セクション。
     /// スキャンは常に非破壊。退避は明示的なボタン + 確認ダイアログでのみ実行する。
     /// </summary>
     public class AkmWindow : EditorWindow
     {
-        private enum Tab { Roots, Protection, Scan }
+        private enum Tab { Roots, Protection, Scan, Duplicates, Cache }
 
         private AkmSettings _settings;
         private Tab _tab = Tab.Roots;
@@ -29,6 +29,16 @@ namespace Maaaaa.Akm.Editor
         // Scan
         private ScanResult _result;
         private bool _scanBlocked;
+
+        // Duplicates
+        private DuplicateReport _dupReport;
+
+        // Cache
+        private List<CacheClean.CacheTarget> _cacheTargets;
+        private bool _cacheMeasured;
+        private long _cacheLibSize;
+        private int _cacheAssetCount;
+        private long _cacheAssetSize;
 
         [MenuItem(AkmStrings.MenuPath)]
         private static void Open()
@@ -58,6 +68,8 @@ namespace Maaaaa.Akm.Editor
                 case Tab.Roots: DrawRootsTab(); break;
                 case Tab.Protection: DrawProtectionTab(); break;
                 case Tab.Scan: DrawScanTab(); break;
+                case Tab.Duplicates: DrawDuplicatesTab(); break;
+                case Tab.Cache: DrawCacheTab(); break;
             }
             EditorGUILayout.EndScrollView();
         }
@@ -69,6 +81,7 @@ namespace Maaaaa.Akm.Editor
                 _tab = (Tab)GUILayout.Toolbar((int)_tab, new[]
                 {
                     AkmStrings.TabRoots, AkmStrings.TabProtection, AkmStrings.TabScan,
+                    AkmStrings.TabDuplicates, AkmStrings.TabCache,
                 });
             }
         }
@@ -108,7 +121,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // 個別ファイル追加（F-ROOT-03）
+            // 個別ファイル追加
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(AkmStrings.RootsAddIndividualHeader, EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(AkmStrings.RootsAddIndividualHelp, MessageType.None);
@@ -151,7 +164,7 @@ namespace Maaaaa.Akm.Editor
                 }
             }
 
-            // 自動検出（F-ROOT-02）
+            // 自動検出
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(AkmStrings.RootsAutoDetectHeader, EditorStyles.boldLabel);
             if (GUILayout.Button(AkmStrings.RootsAutoDetectButton))
@@ -253,7 +266,7 @@ namespace Maaaaa.Akm.Editor
                 string.Join(" ", ProtectionRules.AlwaysProtectedExtensions),
                 EditorStyles.wordWrappedMiniLabel);
 
-            // ユーザーホワイトリスト（F-PROT-03）
+            // ユーザーホワイトリスト
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(AkmStrings.ProtWhitelistHeader, EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(AkmStrings.ProtWhitelistHelp, MessageType.None);
@@ -296,7 +309,7 @@ namespace Maaaaa.Akm.Editor
 
         private void DrawScanTab()
         {
-            // 判定粒度設定（F-GRAN-02）
+            // 判定粒度設定
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUI.BeginChangeCheck();
@@ -309,6 +322,16 @@ namespace Maaaaa.Akm.Editor
                         EditorGUILayout.IntField(_settings.granularityDepth, GUILayout.Width(40)));
                 }
                 if (EditorGUI.EndChangeCheck()) _settings.Save();
+            }
+
+            // ファイル単位モード
+            EditorGUI.BeginChangeCheck();
+            _settings.fileUnitMode = EditorGUILayout.ToggleLeft(
+                AkmStrings.ScanFileUnitToggle, _settings.fileUnitMode);
+            if (EditorGUI.EndChangeCheck()) _settings.Save();
+            if (_settings.fileUnitMode)
+            {
+                EditorGUILayout.HelpBox(AkmStrings.ScanFileUnitHelp, MessageType.Warning);
             }
 
             EditorGUILayout.Space();
@@ -345,7 +368,7 @@ namespace Maaaaa.Akm.Editor
                     AkmStrings.ProgressTitle, AkmStrings.ProgressCollectRoots, 0.05f);
                 var roots = RootCollector.Collect(_settings);
 
-                // F-ROOT-05: ルート未設定ガード
+                // ルート未設定ガード
                 if (roots.HasNoAvatarRoots)
                 {
                     _scanBlocked = true;
@@ -376,6 +399,7 @@ namespace Maaaaa.Akm.Editor
             {
                 EditorGUILayout.HelpBox(AkmStrings.ScanEmpty, MessageType.Info);
                 DrawRestoreSection();
+                DrawPurgeSection();
                 return;
             }
 
@@ -416,7 +440,7 @@ namespace Maaaaa.Akm.Editor
 
                     if (GUILayout.Button(AkmStrings.ScanProtectButton, GUILayout.Width(90)))
                     {
-                        // このフォルダをホワイトリストに追加（§4.3 ワンクリック）
+                        // このフォルダをホワイトリストにワンクリックで追加
                         AddWhitelistGlob(e.UnitPath + "/**");
                         AddWhitelistGlob(e.UnitPath);
                         RunScan();
@@ -432,6 +456,16 @@ namespace Maaaaa.Akm.Editor
             EditorGUILayout.LabelField(string.Format(
                 AkmStrings.ScanSelectedSummaryFormat, selected.Count, AkmUtil.HumanSize(selectedSize)));
 
+            // 退避前 .unitypackage バックアップ
+            EditorGUI.BeginChangeCheck();
+            _settings.exportUnityPackageBeforeRelocate = EditorGUILayout.ToggleLeft(
+                AkmStrings.RelocateExportPackageToggle, _settings.exportUnityPackageBeforeRelocate);
+            if (EditorGUI.EndChangeCheck()) _settings.Save();
+            if (_settings.exportUnityPackageBeforeRelocate)
+            {
+                EditorGUILayout.HelpBox(AkmStrings.RelocateExportPackageHelp, MessageType.None);
+            }
+
             using (new EditorGUI.DisabledScope(selected.Count == 0))
             {
                 if (GUILayout.Button(AkmStrings.RelocateButton, GUILayout.Height(28)))
@@ -441,6 +475,7 @@ namespace Maaaaa.Akm.Editor
             }
 
             DrawRestoreSection();
+            DrawPurgeSection();
         }
 
         private void Relocate(List<ScanResultEntry> selected, long selectedSize)
@@ -451,7 +486,7 @@ namespace Maaaaa.Akm.Editor
                 return;
             }
 
-            // 確認ダイアログ（§7.4）。既定フォーカスはキャンセル。
+            // 確認ダイアログ。既定フォーカスはキャンセル。
             bool ok = EditorUtility.DisplayDialog(
                 AkmStrings.RelocateConfirmTitle,
                 string.Format(AkmStrings.RelocateConfirmFormat, selected.Count, AkmUtil.HumanSize(selectedSize)),
@@ -459,13 +494,15 @@ namespace Maaaaa.Akm.Editor
                 AkmStrings.RelocateConfirmCancel);
             if (!ok) return;
 
-            var trashRoot = AssetRelocator.Relocate(selected, out int moved);
+            var trashRoot = AssetRelocator.Relocate(
+                selected, _settings.exportUnityPackageBeforeRelocate,
+                out int moved, out string exportedPackage);
 
-            // 実行後ガイダンス（§7.5）
-            EditorUtility.DisplayDialog(
-                AkmStrings.RelocateDoneTitle,
-                string.Format(AkmStrings.RelocateDoneFormat, moved, trashRoot),
-                AkmStrings.Ok);
+            // 実行後ガイダンス
+            var doneMsg = string.Format(AkmStrings.RelocateDoneFormat, moved, trashRoot);
+            if (!string.IsNullOrEmpty(exportedPackage))
+                doneMsg += string.Format(AkmStrings.RelocateExportedFormat, exportedPackage);
+            EditorUtility.DisplayDialog(AkmStrings.RelocateDoneTitle, doneMsg, AkmStrings.Ok);
 
             // 退避済みは結果から除外して再描画
             RunScan();
@@ -526,6 +563,240 @@ namespace Maaaaa.Akm.Editor
                 return m?.entries?.Count ?? 0;
             }
             catch { return 0; }
+        }
+
+        // -------------------------------------------------- 完全削除
+
+        private void DrawPurgeSection()
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(AkmStrings.PurgeHeader, EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(AkmStrings.PurgeHelp, MessageType.Warning);
+            if (GUILayout.Button(AkmStrings.PurgeSelectButton))
+            {
+                var abs = EditorUtility.OpenFolderPanel(
+                    AkmStrings.PurgeSelectButton, AkmUtil.ProjectRoot, "");
+                if (string.IsNullOrEmpty(abs)) return;
+                abs = AkmUtil.Normalize(abs);
+
+                if (!AssetRelocator.HasManifest(abs))
+                {
+                    EditorUtility.DisplayDialog(AkmStrings.ToolName, AkmStrings.PurgeNotTrashFolder, AkmStrings.Ok);
+                    return;
+                }
+                Purge(abs);
+                GUIUtility.ExitGUI();
+            }
+        }
+
+        private void Purge(string trashRootAbs)
+        {
+            AssetRelocator.TryGetTrashFolderStats(trashRootAbs, out int count, out long size);
+
+            // 第1段階（既定フォーカスはキャンセル側）
+            bool stage1 = EditorUtility.DisplayDialog(
+                AkmStrings.PurgeConfirmStage1Title,
+                string.Format(AkmStrings.PurgeConfirmStage1Format,
+                    trashRootAbs, count, AkmUtil.HumanSize(size)),
+                AkmStrings.PurgeConfirmProceed, AkmStrings.Cancel);
+            if (!stage1) return;
+
+            // 第2段階（最終確認）
+            bool stage2 = EditorUtility.DisplayDialog(
+                AkmStrings.PurgeConfirmStage2Title,
+                AkmStrings.PurgeConfirmStage2,
+                AkmStrings.PurgeConfirmProceed, AkmStrings.Cancel);
+            if (!stage2) return;
+
+            if (AssetRelocator.PurgeTrashFolder(trashRootAbs, out string error))
+            {
+                EditorUtility.DisplayDialog(AkmStrings.ToolName,
+                    string.Format(AkmStrings.PurgeDoneFormat, trashRootAbs), AkmStrings.Ok);
+            }
+            else
+            {
+                EditorUtility.DisplayDialog(AkmStrings.ToolName,
+                    string.Format(AkmStrings.PurgeFailedFormat, error), AkmStrings.Ok);
+            }
+        }
+
+        // -------------------------------------------------- 重複検出（SHA-256）
+
+        private void DrawDuplicatesTab()
+        {
+            EditorGUILayout.LabelField(AkmStrings.DupHeader, EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(AkmStrings.DupHelp, MessageType.Info);
+
+            if (GUILayout.Button(AkmStrings.DupScanButton, GUILayout.Height(28)))
+            {
+                _dupReport = DuplicateDetector.Scan(_settings);
+                GUIUtility.ExitGUI();
+            }
+
+            if (_dupReport == null)
+            {
+                EditorGUILayout.HelpBox(AkmStrings.DupNotRunYet, MessageType.None);
+                return;
+            }
+            if (_dupReport.Groups.Count == 0)
+            {
+                EditorGUILayout.HelpBox(AkmStrings.DupEmpty, MessageType.Info);
+                return;
+            }
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(string.Format(
+                AkmStrings.DupSummaryFormat,
+                _dupReport.Groups.Count, AkmUtil.HumanSize(_dupReport.TotalWasted)),
+                EditorStyles.boldLabel);
+
+            foreach (var g in _dupReport.Groups)
+            {
+                EditorGUILayout.Space();
+                EditorGUILayout.LabelField(string.Format(
+                    AkmStrings.DupGroupHeaderFormat,
+                    g.Files.Count, AkmUtil.HumanSize(g.FileSize), AkmUtil.HumanSize(g.WastedBytes)),
+                    EditorStyles.boldLabel);
+
+                foreach (var f in g.Files)
+                {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        string used = !_dupReport.UsedKnown || f.Used == null
+                            ? "?"
+                            : (f.Used.Value ? AkmStrings.DupUsedYes : AkmStrings.DupUsedNo);
+                        GUILayout.Label(used, GUILayout.Width(48));
+                        if (GUILayout.Button(new GUIContent(f.Path, f.Path),
+                                EditorStyles.linkLabel, GUILayout.ExpandWidth(true)))
+                        {
+                            PingPath(f.Path);
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------- キャッシュ掃除
+
+        private void DrawCacheTab()
+        {
+            EditorGUILayout.LabelField(AkmStrings.CacheHeader, EditorStyles.boldLabel);
+
+            // OS ガード（Phase 2 は Windows のみ）
+            if (!CacheClean.IsWindows)
+            {
+                EditorGUILayout.HelpBox(AkmStrings.CacheWindowsOnly, MessageType.Warning);
+                return;
+            }
+
+            EditorGUILayout.HelpBox(AkmStrings.CacheIntro, MessageType.None);
+            // 目立つ警告
+            EditorGUILayout.HelpBox(AkmStrings.CacheWarnMain, MessageType.Warning);
+
+            // 予約中の表示
+            if (CacheClean.IsReserved())
+            {
+                var pending = CacheClean.ReadPending();
+                EditorGUILayout.HelpBox(string.Format(
+                    AkmStrings.CacheReservedNoteFormat, pending?.reservedAt ?? ""), MessageType.Warning);
+                if (GUILayout.Button(AkmStrings.CacheCancelReserveButton))
+                {
+                    CacheClean.CancelReservation();
+                }
+                EditorGUILayout.Space();
+            }
+
+            // Logs を含めるか
+            EditorGUI.BeginChangeCheck();
+            _settings.cacheCleanIncludeLogs = EditorGUILayout.ToggleLeft(
+                AkmStrings.CacheIncludeLogsToggle, _settings.cacheCleanIncludeLogs);
+            if (EditorGUI.EndChangeCheck())
+            {
+                _settings.Save();
+                _cacheMeasured = false; // 対象が変わるので再計測を促す
+            }
+
+            EditorGUILayout.Space();
+            if (GUILayout.Button(AkmStrings.CacheMeasureButton))
+            {
+                MeasureCache();
+            }
+
+            // 数値の根拠
+            if (_cacheMeasured)
+            {
+                EditorGUILayout.HelpBox(string.Format(
+                    AkmStrings.CacheStatsFormat,
+                    AkmUtil.HumanSize(_cacheLibSize),
+                    _cacheAssetCount,
+                    AkmUtil.HumanSize(_cacheAssetSize)), MessageType.Info);
+
+                // 削除対象を全件列挙
+                EditorGUILayout.LabelField(AkmStrings.CacheTargetsHeader, EditorStyles.boldLabel);
+                foreach (var t in _cacheTargets.Where(t => t.Enabled))
+                {
+                    var size = t.SizeBytes >= 0 ? AkmUtil.HumanSize(t.SizeBytes) : "未計測";
+                    EditorGUILayout.LabelField(
+                        $"・{t.RelativePath}/   （{size}{(t.Exists ? "" : " / 無し")}）",
+                        EditorStyles.miniLabel);
+                }
+                EditorGUILayout.LabelField(AkmStrings.CacheTargetsCsprojNote, EditorStyles.miniLabel);
+            }
+
+            // 所要時間の目安（実測優先）
+            EditorGUILayout.Space();
+            if (_settings.lastReimportSeconds > 0)
+            {
+                EditorGUILayout.HelpBox(string.Format(
+                    AkmStrings.CacheTimeEstimateMeasuredFormat,
+                    AkmUtil.HumanDuration(_settings.lastReimportSeconds)), MessageType.Info);
+            }
+            EditorGUILayout.HelpBox(AkmStrings.CacheTimeEstimateGeneric, MessageType.None);
+            // 実行タイミング助言
+            EditorGUILayout.HelpBox(AkmStrings.CacheTimingAdvice, MessageType.None);
+
+            // 実行導線（二段階確認は専用ウィンドウ）
+            EditorGUILayout.Space();
+            using (new EditorGUI.DisabledScope(!_cacheMeasured))
+            {
+                if (GUILayout.Button(AkmStrings.CacheReserveButton, GUILayout.Height(26)))
+                {
+                    OpenCacheConfirm(CacheCleanConfirmWindow.Mode.Reserve);
+                }
+                if (GUILayout.Button(AkmStrings.CacheCleanNowButton, GUILayout.Height(22)))
+                {
+                    OpenCacheConfirm(CacheCleanConfirmWindow.Mode.CleanNow);
+                }
+            }
+
+            // フォールバック
+            EditorGUILayout.Space();
+            using (new EditorGUI.DisabledScope(!_cacheMeasured))
+            {
+                if (GUILayout.Button(AkmStrings.CacheFallbackButton))
+                {
+                    var path = CacheClean.WriteFallbackBat(_cacheTargets);
+                    EditorUtility.DisplayDialog(AkmStrings.ToolName,
+                        string.Format(AkmStrings.CacheFallbackDoneFormat, path), AkmStrings.Ok);
+                }
+            }
+        }
+
+        private void MeasureCache()
+        {
+            _cacheTargets = CacheClean.EnumerateTargets(_settings);
+            CacheClean.MeasureSizes(_cacheTargets);
+            _cacheLibSize = CacheClean.MeasureLibrarySize();
+            CacheClean.MeasureAssets(out _cacheAssetCount, out _cacheAssetSize);
+            _cacheMeasured = true;
+        }
+
+        private void OpenCacheConfirm(CacheCleanConfirmWindow.Mode mode)
+        {
+            if (!_cacheMeasured || _cacheTargets == null) MeasureCache();
+            CacheCleanConfirmWindow.Open(
+                mode, _cacheTargets, _cacheLibSize, _cacheAssetCount, _cacheAssetSize,
+                _settings.lastReimportSeconds);
         }
 
         private static void PingPath(string assetPath)

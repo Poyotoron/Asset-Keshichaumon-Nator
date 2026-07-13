@@ -6,7 +6,7 @@ using UnityEngine;
 namespace Maaaaa.Akm.Editor
 {
     /// <summary>
-    /// 設定の永続化（要件 §7.1）。
+    /// 設定の永続化。
     /// Assets/Asset-Keshichaumon-Nator/Settings.asset に保存する。
     /// </summary>
     internal class AkmSettings : ScriptableObject
@@ -31,6 +31,18 @@ namespace Maaaaa.Akm.Editor
 
         [Tooltip("最も浅いコンテンツフォルダを自動推定する（深度指定を無視）")]
         public bool autoEstimateGranularity = true;
+
+        [Tooltip("上級者向け: フォルダ集約を無効化し、純粋なファイル単位で列挙する。既定 OFF")]
+        public bool fileUnitMode = false;
+
+        [Tooltip("退避実行前に対象を .unitypackage としてエクスポートする。既定 OFF")]
+        public bool exportUnityPackageBeforeRelocate = false;
+
+        [Tooltip("キャッシュ掃除で Logs/ も削除対象に含める。既定 OFF")]
+        public bool cacheCleanIncludeLogs = false;
+
+        [Tooltip("前回キャッシュ掃除後にかかった再インポート時間（秒）。0 は未計測")]
+        public double lastReimportSeconds = 0;
 
         [Tooltip("前回スキャン日時")]
         public string lastScanTime = "";
