@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -19,12 +20,9 @@ namespace Maaaaa.Akm.Editor
         {
             var result = new ScanResult { RootCount = roots.AvatarRoots.Count };
 
-            // --- Mark: ルートからの到達集合 ---
+            // --- Mark: ルートからの到達集合（NFR-01: キャッシュ利用）---
             EditorUtility.DisplayProgressBar(AkmStrings.ProgressTitle, AkmStrings.ProgressBuildReachable, 0.2f);
-            var reachable = new HashSet<string>(
-                AssetDatabase.GetDependencies(roots.AllRoots.ToArray(), true));
-            // ルート自身も到達扱い（GetDependencies は入力を含むが念のため）
-            foreach (var r in roots.AllRoots) reachable.Add(r);
+            var reachable = DependencyCache.GetReachable(roots.AllRoots);
 
             // --- 全アセット列挙（Assets 配下のファイルのみ）---
             EditorUtility.DisplayProgressBar(AkmStrings.ProgressTitle, AkmStrings.ProgressEnumerate, 0.4f);
@@ -38,63 +36,100 @@ namespace Maaaaa.Akm.Editor
             }
 
             // --- 導入単位フォルダへ集約（§5）---
+            // ファイル単位モード（F-GRAN-03）でも、保護判定は「その導入単位フォルダの中身」を
+            // 文脈として使う。これによりコード/シェーダーを含むフォルダ内の個別ファイルも保護され、
+            // 安全性（P-4）を保ったまま列挙粒度だけを細かくできる。
             EditorUtility.DisplayProgressBar(AkmStrings.ProgressTitle, AkmStrings.ProgressClassify, 0.6f);
             var unitOf = new UnitResolver(settings, allFiles);
-            var units = new Dictionary<string, List<string>>();
+            var folderUnits = new Dictionary<string, List<string>>();
+            var folderUnitOf = new Dictionary<string, string>();
             foreach (var f in allFiles)
             {
                 var unit = unitOf.Resolve(f);
-                if (!units.TryGetValue(unit, out var list))
+                folderUnitOf[f] = unit;
+                if (!folderUnits.TryGetValue(unit, out var list))
                 {
                     list = new List<string>();
-                    units[unit] = list;
+                    folderUnits[unit] = list;
                 }
                 list.Add(f);
             }
 
-            result.TotalUnits = units.Count;
             var whitelist = settings.userWhitelistGlobs;
 
-            int i = 0;
-            foreach (var kv in units)
+            if (settings.fileUnitMode)
             {
-                if ((i++ & 63) == 0)
+                result.TotalUnits = allFiles.Count;
+                int fi = 0;
+                foreach (var f in allFiles)
                 {
-                    EditorUtility.DisplayProgressBar(
-                        AkmStrings.ProgressTitle, AkmStrings.ProgressClassify,
-                        0.6f + 0.4f * i / units.Count);
+                    if ((fi++ & 255) == 0)
+                    {
+                        EditorUtility.DisplayProgressBar(
+                            AkmStrings.ProgressTitle, AkmStrings.ProgressClassify,
+                            0.6f + 0.4f * fi / Math.Max(1, allFiles.Count));
+                    }
+
+                    if (reachable.Contains(f)) { result.UsedUnits++; continue; }
+
+                    // 保護文脈 = このファイルが属する導入単位フォルダの中身
+                    var ctxFiles = folderUnits[folderUnitOf[f]];
+                    if (ProtectionRules.IsProtectedUnit(f, ctxFiles, whitelist, out _))
+                    {
+                        result.ProtectedUnits++;
+                        continue;
+                    }
+
+                    var single = new List<string> { f };
+                    result.Candidates.Add(new ScanResultEntry
+                    {
+                        UnitPath = f,
+                        ContainedFiles = single,
+                        SizeBytes = AkmUtil.FileSize(f),
+                        Kind = ComputeKind(single, out var kd),
+                        KindDetail = kd,
+                        Reason = AkmStrings.ReasonUnreachable,
+                        Selected = false,
+                    });
                 }
-
-                var unitPath = kv.Key;
-                var files = kv.Value;
-
-                // 使用中: フォルダ内に到達アセットが1つでもあれば使用中（F-GRAN-01）
-                bool used = files.Any(f => reachable.Contains(f));
-                if (used)
+            }
+            else
+            {
+                result.TotalUnits = folderUnits.Count;
+                int i = 0;
+                foreach (var kv in folderUnits)
                 {
-                    result.UsedUnits++;
-                    continue;
+                    if ((i++ & 63) == 0)
+                    {
+                        EditorUtility.DisplayProgressBar(
+                            AkmStrings.ProgressTitle, AkmStrings.ProgressClassify,
+                            0.6f + 0.4f * i / folderUnits.Count);
+                    }
+
+                    var unitPath = kv.Key;
+                    var files = kv.Value;
+
+                    // 使用中: フォルダ内に到達アセットが1つでもあれば使用中（F-GRAN-01）
+                    if (files.Any(f => reachable.Contains(f))) { result.UsedUnits++; continue; }
+
+                    // 保護（§4）
+                    if (ProtectionRules.IsProtectedUnit(unitPath, files, whitelist, out _))
+                    {
+                        result.ProtectedUnits++;
+                        continue;
+                    }
+
+                    result.Candidates.Add(new ScanResultEntry
+                    {
+                        UnitPath = unitPath,
+                        ContainedFiles = files,
+                        SizeBytes = files.Sum(AkmUtil.FileSize),
+                        Kind = ComputeKind(files, out var kindDetail),
+                        KindDetail = kindDetail,
+                        Reason = AkmStrings.ReasonUnreachable,
+                        Selected = false, // 既定は全選択 OFF（§7.3）
+                    });
                 }
-
-                // 保護（§4）
-                if (ProtectionRules.IsProtectedUnit(unitPath, files, whitelist, out _))
-                {
-                    result.ProtectedUnits++;
-                    continue;
-                }
-
-                // 退避候補
-                var entry = new ScanResultEntry
-                {
-                    UnitPath = unitPath,
-                    ContainedFiles = files,
-                    SizeBytes = files.Sum(AkmUtil.FileSize),
-                    Kind = ComputeKind(files, out var kindDetail),
-                    KindDetail = kindDetail,
-                    Reason = AkmStrings.ReasonUnreachable,
-                    Selected = false, // 既定は全選択 OFF（§7.3）
-                };
-                result.Candidates.Add(entry);
             }
 
             // サイズ降順ソートを既定（§7.3）

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -38,14 +39,33 @@ namespace Maaaaa.Akm.Editor
     {
         private const string ManifestFileName = ".akm-relocation.json";
         private const string TrashPrefix = "_UnusedAssets_";
+        private const string BackupPackageName = "backup.unitypackage";
 
         /// <summary>退避を実行し、作成した退避フォルダの絶対パスを返す。</summary>
         public static string Relocate(IReadOnlyList<ScanResultEntry> targets, out int movedCount)
         {
+            return Relocate(targets, false, out movedCount, out _);
+        }
+
+        /// <summary>
+        /// 退避を実行する（F-DEL-01）。exportPackage=true なら移動前に .unitypackage を書き出す（F-DEL-03）。
+        /// </summary>
+        /// <param name="exportedPackagePath">書き出した .unitypackage の絶対パス（未書き出しは null）。</param>
+        public static string Relocate(
+            IReadOnlyList<ScanResultEntry> targets, bool exportPackage,
+            out int movedCount, out string exportedPackagePath)
+        {
             movedCount = 0;
+            exportedPackagePath = null;
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var trashRoot = AkmUtil.Normalize(Path.Combine(AkmUtil.ProjectRoot, TrashPrefix + timestamp));
             Directory.CreateDirectory(trashRoot);
+
+            // F-DEL-03: 移動前（アセットがまだ Assets/ にある間）に .unitypackage を書き出す。
+            if (exportPackage)
+            {
+                exportedPackagePath = ExportBackup(targets, trashRoot);
+            }
 
             var manifest = new RelocationManifest { createdAt = timestamp };
 
@@ -190,6 +210,74 @@ namespace Maaaaa.Akm.Editor
         public static bool HasManifest(string folderAbs)
         {
             return File.Exists(Path.Combine(folderAbs, ManifestFileName));
+        }
+
+        /// <summary>
+        /// F-DEL-03: 退避対象を .unitypackage としてエクスポートする。書き出したパスを返す（失敗時 null）。
+        /// 依存は含めず（IncludeDependencies を使わない）、退避する範囲のみを再帰的に含める。
+        /// </summary>
+        private static string ExportBackup(IReadOnlyList<ScanResultEntry> targets, string trashRoot)
+        {
+            try
+            {
+                EditorUtility.DisplayProgressBar(
+                    AkmStrings.ToolName, AkmStrings.ProgressExportPackage, 0f);
+                var paths = targets.Select(t => t.UnitPath)
+                    .Where(p => !string.IsNullOrEmpty(p)).Distinct().ToArray();
+                if (paths.Length == 0) return null;
+
+                var outPath = AkmUtil.Normalize(Path.Combine(trashRoot, BackupPackageName));
+                AssetDatabase.ExportPackage(paths, outPath, ExportPackageOptions.Recurse);
+                return outPath;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[{AkmStrings.ToolName}] .unitypackage の書き出しに失敗しました: {ex.Message}");
+                return null;
+            }
+            finally
+            {
+                EditorUtility.ClearProgressBar();
+            }
+        }
+
+        /// <summary>退避フォルダ内のアセット数（マニフェスト件数）と合計サイズを見積もる。</summary>
+        public static bool TryGetTrashFolderStats(string trashRootAbs, out int count, out long sizeBytes)
+        {
+            count = 0;
+            sizeBytes = 0;
+            var manifest = ReadManifest(trashRootAbs);
+            if (manifest == null) return false;
+            count = manifest.entries.Count;
+            sizeBytes = AkmUtil.DirectorySize(trashRootAbs);
+            return true;
+        }
+
+        /// <summary>
+        /// F-DEL-04: 退避フォルダを完全に削除する（取り消し不可）。
+        /// 安全のため、本ツールの退避フォルダ（マニフェストを持つ）以外は削除を拒否する。
+        /// </summary>
+        public static bool PurgeTrashFolder(string trashRootAbs, out string error)
+        {
+            error = null;
+            if (!HasManifest(trashRootAbs))
+            {
+                error = AkmStrings.PurgeNotTrashFolder;
+                return false;
+            }
+            try
+            {
+                Directory.Delete(trashRootAbs, true);
+                // 退避フォルダは Assets 外なので .meta は無い（Refresh 不要だが念のため）。
+                AssetDatabase.Refresh();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                Debug.LogWarning($"[{AkmStrings.ToolName}] 退避フォルダの完全削除に失敗: {ex.Message}");
+                return false;
+            }
         }
 
         private static void MoveMetaIfExists(string absSource, string absDest)
