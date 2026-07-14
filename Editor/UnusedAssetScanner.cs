@@ -63,6 +63,7 @@ namespace Maaaaa.Akn.Editor
 
             if (settings.fileUnitMode)
             {
+                var protectedByUnit = new Dictionary<string, ProtectedUnitEntry>();
                 int fi = 0;
                 foreach (var f in allFiles)
                 {
@@ -84,9 +85,17 @@ namespace Maaaaa.Akn.Editor
 
                     // 保護文脈 = このファイルが属する導入単位フォルダの中身
                     var ctxFiles = folderUnits[folderUnitOf[f]];
-                    if (ProtectionRules.IsProtectedUnit(f, ctxFiles, whitelist, out _))
+                    if (ProtectionRules.IsProtectedUnit(f, ctxFiles, whitelist, out var reason))
                     {
-                        result.ProtectedUnits++;
+                        result.ProtectedCount++;
+                        var unitPath = folderUnitOf[f];
+                        if (!protectedByUnit.TryGetValue(unitPath, out var entry))
+                        {
+                            entry = new ProtectedUnitEntry { UnitPath = unitPath, Reason = reason };
+                            protectedByUnit[unitPath] = entry;
+                        }
+                        entry.FileCount++;
+                        entry.SizeBytes += AknUtil.FileSize(f);
                         continue;
                     }
 
@@ -102,6 +111,7 @@ namespace Maaaaa.Akn.Editor
                         Selected = false,
                     });
                 }
+                result.ProtectedEntries.AddRange(protectedByUnit.Values);
             }
             else
             {
@@ -130,9 +140,16 @@ namespace Maaaaa.Akn.Editor
                     if (files.Any(f => reachable.Contains(f))) { result.UsedUnits++; continue; }
 
                     // 保護
-                    if (ProtectionRules.IsProtectedUnit(unitPath, files, whitelist, out _))
+                    if (ProtectionRules.IsProtectedUnit(unitPath, files, whitelist, out var reason))
                     {
-                        result.ProtectedUnits++;
+                        result.ProtectedCount++;
+                        result.ProtectedEntries.Add(new ProtectedUnitEntry
+                        {
+                            UnitPath = unitPath,
+                            Reason = reason,
+                            FileCount = files.Count,
+                            SizeBytes = files.Sum(AknUtil.FileSize),
+                        });
                         continue;
                     }
 
@@ -149,9 +166,69 @@ namespace Maaaaa.Akn.Editor
                 }
             }
 
-            // サイズ降順ソートを既定にする
-            result.Candidates.Sort((a, b) => b.SizeBytes.CompareTo(a.SizeBytes));
+            BuildCandidateGroups(result.Candidates);
+            SortCandidateGroups(result.Candidates);
+            result.ProtectedEntries.Sort((a, b) => b.SizeBytes.CompareTo(a.SizeBytes));
             return result;
+        }
+
+        private static void BuildCandidateGroups(List<ScanResultEntry> candidates)
+        {
+            int count = candidates.Count;
+            var parent = Enumerable.Range(0, count).ToArray();
+            var candidateOfFile = new Dictionary<string, int>();
+            for (int i = 0; i < count; i++)
+                foreach (var file in candidates[i].ContainedFiles) candidateOfFile[file] = i;
+
+            for (int i = 0; i < count; i++)
+            {
+                if ((i & 63) == 0)
+                {
+                    EditorUtility.DisplayProgressBar(AknStrings.ProgressTitle,
+                        AknStrings.ProgressBuildCandidateGroups, (float)i / count);
+                }
+                var dependencies = AssetDatabase.GetDependencies(candidates[i].ContainedFiles.ToArray(), true);
+                foreach (var dependency in dependencies)
+                {
+                    if (!candidateOfFile.TryGetValue(dependency, out var j) || i == j) continue;
+                    Union(parent, i, j);
+                    if (!candidates[j].ReferencedByUnits.Contains(candidates[i].UnitPath))
+                        candidates[j].ReferencedByUnits.Add(candidates[i].UnitPath);
+                }
+            }
+
+            var groupIds = new Dictionary<int, int>();
+            int nextGroupId = 0;
+            for (int i = 0; i < count; i++)
+            {
+                int root = Find(parent, i);
+                if (!groupIds.TryGetValue(root, out var groupId))
+                    groupIds[root] = groupId = nextGroupId++;
+                candidates[i].GroupId = groupId;
+                candidates[i].ReferencedByUnits.Sort(StringComparer.Ordinal);
+            }
+        }
+
+        private static int Find(int[] parent, int x)
+        {
+            while (parent[x] != x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+            return x;
+        }
+
+        private static void Union(int[] parent, int a, int b)
+        {
+            a = Find(parent, a); b = Find(parent, b);
+            if (a != b) parent[b] = a;
+        }
+
+        private static void SortCandidateGroups(List<ScanResultEntry> candidates)
+        {
+            var sorted = candidates.GroupBy(c => c.GroupId)
+                .Select(g => new { Total = g.Sum(c => c.SizeBytes), Members = g.OrderByDescending(c => c.SizeBytes) })
+                .OrderByDescending(g => g.Total)
+                .SelectMany(g => g.Members).ToList();
+            candidates.Clear();
+            candidates.AddRange(sorted);
         }
 
         private static bool IsInScope(string path, List<string> scopeDirectories)
@@ -205,6 +282,7 @@ namespace Maaaaa.Akn.Editor
     internal class UnitResolver
     {
         private readonly AknSettings _settings;
+        private readonly List<string> _toolOutputDirectories;
 
         // 自動推定用: 各フォルダの直下ファイル有無 / 直下子フォルダ集合
         private readonly HashSet<string> _foldersWithDirectFiles = new HashSet<string>();
@@ -214,6 +292,8 @@ namespace Maaaaa.Akn.Editor
         public UnitResolver(AknSettings settings, List<string> allFiles)
         {
             _settings = settings;
+            _toolOutputDirectories = (settings.toolOutputDirectories ?? new List<string>())
+                .Where(p => !string.IsNullOrEmpty(p)).OrderByDescending(p => p.Length).ToList();
             if (settings.autoEstimateGranularity)
             {
                 BuildFolderTree(allFiles);
@@ -222,6 +302,14 @@ namespace Maaaaa.Akn.Editor
 
         public string Resolve(string assetPath)
         {
+            foreach (var output in _toolOutputDirectories)
+            {
+                var prefix = output.TrimEnd('/') + "/";
+                if (!assetPath.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                var remainder = assetPath.Substring(prefix.Length);
+                int slash = remainder.IndexOf('/');
+                return slash < 0 ? assetPath : prefix + remainder.Substring(0, slash);
+            }
             return _settings.autoEstimateGranularity
                 ? ResolveAuto(assetPath)
                 : ResolveFixedDepth(assetPath, _settings.granularityDepth);
