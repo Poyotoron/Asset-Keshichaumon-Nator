@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.Linq;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -85,12 +85,6 @@ namespace Maaaaa.Akn.Editor
                             Debug.LogWarning("設定の移行後に新しいパスから読み直せませんでした。移行した設定をそのまま使います。");
                         }
 
-                        if (AssetDatabase.IsValidFolder(LegacySettingsFolder) &&
-                            !AssetDatabase.GetAllAssetPaths().Any(path =>
-                                path.StartsWith(LegacySettingsFolder + "/")))
-                        {
-                            AssetDatabase.DeleteAsset(LegacySettingsFolder);
-                        }
                         Debug.Log($"設定を {LegacySettingsPath} から {SettingsPath} へ移行しました。");
                     }
                     else
@@ -110,8 +104,32 @@ namespace Maaaaa.Akn.Editor
                     AssetDatabase.SaveAssets();
                 }
             }
+            CleanupLegacySettingsFolder();
             _cached = settings;
             return settings;
+        }
+
+        private static void CleanupLegacySettingsFolder()
+        {
+            if (!AssetDatabase.IsValidFolder(LegacySettingsFolder)) return;
+
+            var absolutePath = AknUtil.ToAbsolute(LegacySettingsFolder);
+            if (!Directory.Exists(absolutePath)) return;
+            using (var entries = Directory.EnumerateFileSystemEntries(absolutePath).GetEnumerator())
+            {
+                // ユーザーのファイルや移行途中のデータが少しでも残っていれば削除しない。
+                if (entries.MoveNext()) return;
+            }
+
+            if (AssetDatabase.DeleteAsset(LegacySettingsFolder))
+            {
+                Debug.Log($"空の旧設定フォルダを削除しました: {LegacySettingsFolder}");
+            }
+            else
+            {
+                // 次のドメインリロード時に再試行するため、設定の読み込み自体は続行する。
+                Debug.LogWarning($"空の旧設定フォルダを削除できませんでした: {LegacySettingsFolder}");
+            }
         }
 
         private static void EnsureSettingsFolder()
