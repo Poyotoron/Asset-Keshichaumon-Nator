@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     internal enum AssetKind
     {
@@ -44,7 +44,11 @@ namespace Maaaaa.Akm.Editor
         public int TotalUnits;
         public int UsedUnits;
         public int ProtectedUnits;
+        /// <summary>スキャン範囲の外だったため、判定せずに除外した単位の数。</summary>
+        public int OutOfScopeUnits;
         public int RootCount;
+        /// <summary>このスキャンで適用された範囲（空ならプロジェクト全体）。結果表示用。</summary>
+        public List<string> ScopeDirectories = new List<string>();
         public List<string> Messages = new List<string>();
 
         public long TotalCandidateSize

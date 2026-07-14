@@ -5,7 +5,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     [Serializable]
     internal class RelocationEntry
@@ -18,14 +18,26 @@ namespace Maaaaa.Akm.Editor
 
         /// <summary>ディレクトリなら true、単一ファイルなら false。</summary>
         public bool isDirectory;
+
+        /// <summary>退避によって空になったため畳んだフォルダ（中身は無く、.meta だけを退避している）。</summary>
+        public bool wasEmptyFolder;
     }
 
     [Serializable]
     internal class RelocationManifest
     {
         public string createdAt;
-        public string toolVersion = "0.1.0";
+        public string toolVersion = "0.3.0";
         public List<RelocationEntry> entries = new List<RelocationEntry>();
+    }
+
+    internal class TrashFolderInfo
+    {
+        public string AbsPath;
+        public string CreatedAt;
+        public int EntryCount;
+        public long SizeBytes;
+        public bool HasBackupPackage;
     }
 
     /// <summary>
@@ -37,14 +49,14 @@ namespace Maaaaa.Akm.Editor
     /// </summary>
     internal static class AssetRelocator
     {
-        private const string ManifestFileName = ".akm-relocation.json";
-        private const string TrashPrefix = "_UnusedAssets_";
+        internal const string ManifestFileName = ".akn-relocation.json";
+        internal const string TrashPrefix = "_UnusedAssets_";
         private const string BackupPackageName = "backup.unitypackage";
 
         /// <summary>退避を実行し、作成した退避フォルダの絶対パスを返す。</summary>
         public static string Relocate(IReadOnlyList<ScanResultEntry> targets, out int movedCount)
         {
-            return Relocate(targets, false, out movedCount, out _);
+            return Relocate(targets, false, out movedCount, out _, out _);
         }
 
         /// <summary>
@@ -55,10 +67,19 @@ namespace Maaaaa.Akm.Editor
             IReadOnlyList<ScanResultEntry> targets, bool exportPackage,
             out int movedCount, out string exportedPackagePath)
         {
+            return Relocate(targets, exportPackage, out movedCount, out exportedPackagePath, out _);
+        }
+
+        public static string Relocate(
+            IReadOnlyList<ScanResultEntry> targets, bool exportPackage,
+            out int movedCount, out string exportedPackagePath, out int foldedFolderCount)
+        {
             movedCount = 0;
             exportedPackagePath = null;
+            foldedFolderCount = 0;
+            var foldersToFold = CollectFoldersThatBecomeEmpty(targets.Select(t => t.UnitPath).ToList());
             var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var trashRoot = AkmUtil.Normalize(Path.Combine(AkmUtil.ProjectRoot, TrashPrefix + timestamp));
+            var trashRoot = AknUtil.Normalize(Path.Combine(AknUtil.ProjectRoot, TrashPrefix + timestamp));
             Directory.CreateDirectory(trashRoot);
 
             // 移動前（アセットがまだ Assets/ にある間）に .unitypackage を書き出す。
@@ -75,20 +96,20 @@ namespace Maaaaa.Akm.Editor
                 {
                     var t = targets[i];
                     EditorUtility.DisplayProgressBar(
-                        AkmStrings.ToolName, AkmStrings.ProgressRelocate + "\n" + t.UnitPath,
+                        AknStrings.ToolName, AknStrings.ProgressRelocate + "\n" + t.UnitPath,
                         (float)i / Math.Max(1, targets.Count));
 
-                    var absSource = AkmUtil.ToAbsolute(t.UnitPath);
+                    var absSource = AknUtil.ToAbsolute(t.UnitPath);
                     bool isDir = Directory.Exists(absSource);
                     bool isFile = File.Exists(absSource);
                     if (!isDir && !isFile)
                     {
-                        Debug.LogWarning($"[{AkmStrings.ToolName}] 退避対象が存在しません: {t.UnitPath}");
+                        Debug.LogWarning($"[{AknStrings.ToolName}] 退避対象が存在しません: {t.UnitPath}");
                         continue;
                     }
 
                     // 退避先は元の構造をそのまま保持（trashRoot/Assets/...）
-                    var absDest = AkmUtil.Normalize(Path.Combine(trashRoot, t.UnitPath));
+                    var absDest = AknUtil.Normalize(Path.Combine(trashRoot, t.UnitPath));
                     var absDestParent = Path.GetDirectoryName(absDest);
                     if (!string.IsNullOrEmpty(absDestParent)) Directory.CreateDirectory(absDestParent);
 
@@ -107,6 +128,28 @@ namespace Maaaaa.Akm.Editor
                     movedCount++;
                 }
 
+                foreach (var folderPath in foldersToFold)
+                {
+                    var absFolder = AknUtil.ToAbsolute(folderPath);
+                    if (!Directory.Exists(absFolder) || Directory.GetFileSystemEntries(absFolder).Length != 0)
+                        continue;
+
+                    var absArchivedFolder = AknUtil.Normalize(Path.Combine(trashRoot, folderPath));
+                    var absArchivedParent = Path.GetDirectoryName(absArchivedFolder);
+                    if (!string.IsNullOrEmpty(absArchivedParent)) Directory.CreateDirectory(absArchivedParent);
+                    MoveMetaIfExists(absFolder, absArchivedFolder);
+                    Directory.Delete(absFolder);
+
+                    manifest.entries.Add(new RelocationEntry
+                    {
+                        originalPath = folderPath,
+                        archivedRelativePath = folderPath,
+                        isDirectory = true,
+                        wasEmptyFolder = true,
+                    });
+                    foldedFolderCount++;
+                }
+
                 WriteManifest(trashRoot, manifest);
             }
             finally
@@ -116,6 +159,56 @@ namespace Maaaaa.Akm.Editor
             }
 
             return trashRoot;
+        }
+
+        /// <summary>
+        /// 指定したユニットを退避したとき、中身が完全に空になる親フォルダを列挙する。
+        /// ファイルシステムを読むだけで、何も変更しない。戻り値は深い順。
+        /// </summary>
+        internal static List<string> CollectFoldersThatBecomeEmpty(IReadOnlyList<string> unitPaths)
+        {
+            var units = new HashSet<string>(unitPaths.Where(p => !string.IsNullOrEmpty(p)));
+            var candidates = new HashSet<string>();
+            foreach (var unitPath in units)
+            {
+                var folderPath = Path.GetDirectoryName(unitPath)?.Replace('\\', '/');
+                while (!string.IsNullOrEmpty(folderPath) && folderPath != "Assets")
+                {
+                    if (!folderPath.StartsWith("Assets/")) break;
+                    candidates.Add(folderPath);
+                    folderPath = Path.GetDirectoryName(folderPath)?.Replace('\\', '/');
+                }
+            }
+
+            var orderedCandidates = candidates
+                .OrderByDescending(path => path.Count(c => c == '/'))
+                .ToList();
+            var foldersThatBecomeEmpty = new HashSet<string>();
+
+            foreach (var folderPath in orderedCandidates)
+            {
+                var absFolder = AknUtil.ToAbsolute(folderPath);
+                if (!Directory.Exists(absFolder)) continue;
+
+                var entries = Directory.GetFileSystemEntries(absFolder);
+                if (entries.Length == 0) continue;
+
+                bool allEntriesWillMove = entries.All(entry =>
+                {
+                    var assetPath = AknUtil.ToAssetPath(entry);
+                    if (Directory.Exists(entry))
+                        return units.Contains(assetPath) || foldersThatBecomeEmpty.Contains(assetPath);
+
+                    return units.Contains(assetPath)
+                        || (assetPath.EndsWith(".meta")
+                            && (units.Contains(assetPath.Substring(0, assetPath.Length - ".meta".Length))
+                                || foldersThatBecomeEmpty.Contains(assetPath.Substring(0, assetPath.Length - ".meta".Length))));
+                });
+
+                if (allEntriesWillMove) foldersThatBecomeEmpty.Add(folderPath);
+            }
+
+            return orderedCandidates.Where(foldersThatBecomeEmpty.Contains).ToList();
         }
 
         /// <summary>退避フォルダから復元する。復元件数を返す。</summary>
@@ -129,19 +222,21 @@ namespace Maaaaa.Akm.Editor
             int restored = 0;
             try
             {
-                for (int i = 0; i < manifest.entries.Count; i++)
+                var normalEntries = manifest.entries.Where(e => !e.wasEmptyFolder).ToList();
+                var emptyFolderEntries = manifest.entries.Where(e => e.wasEmptyFolder).ToList();
+                for (int i = 0; i < normalEntries.Count; i++)
                 {
-                    var e = manifest.entries[i];
+                    var e = normalEntries[i];
                     EditorUtility.DisplayProgressBar(
-                        AkmStrings.ToolName, AkmStrings.ProgressRestore + "\n" + e.originalPath,
+                        AknStrings.ToolName, AknStrings.ProgressRestore + "\n" + e.originalPath,
                         (float)i / Math.Max(1, manifest.entries.Count));
 
-                    var absSource = AkmUtil.Normalize(Path.Combine(trashRootAbs, e.archivedRelativePath));
-                    var absDest = AkmUtil.ToAbsolute(e.originalPath);
+                    var absSource = AknUtil.Normalize(Path.Combine(trashRootAbs, e.archivedRelativePath));
+                    var absDest = AknUtil.ToAbsolute(e.originalPath);
 
                     if (e.isDirectory ? Directory.Exists(absDest) : File.Exists(absDest))
                     {
-                        Debug.LogWarning($"[{AkmStrings.ToolName}] 復元先が既に存在します。スキップ: {e.originalPath}");
+                        Debug.LogWarning($"[{AknStrings.ToolName}] 復元先が既に存在します。スキップ: {e.originalPath}");
                         continue;
                     }
 
@@ -159,6 +254,24 @@ namespace Maaaaa.Akm.Editor
                         File.Move(absSource, absDest);
                     }
                     MoveMetaIfExists(absSource, absDest);
+                    restored++;
+                }
+
+                foreach (var e in emptyFolderEntries)
+                {
+                    var absSource = AknUtil.Normalize(Path.Combine(trashRootAbs, e.archivedRelativePath));
+                    var absDest = AknUtil.ToAbsolute(e.originalPath);
+                    var sourceMeta = absSource + ".meta";
+                    var destinationMeta = absDest + ".meta";
+
+                    if (!Directory.Exists(absDest)) Directory.CreateDirectory(absDest);
+                    if (!File.Exists(sourceMeta)) continue;
+                    if (File.Exists(destinationMeta))
+                    {
+                        Debug.LogWarning($"[{AknStrings.ToolName}] {string.Format(AknStrings.RestoreMetaAlreadyExistsFormat, e.originalPath)}");
+                        continue;
+                    }
+                    File.Move(sourceMeta, destinationMeta);
                     restored++;
                 }
 
@@ -201,7 +314,7 @@ namespace Maaaaa.Akm.Editor
             catch (System.Exception ex)
             {
                 Debug.LogWarning(
-                    $"[{AkmStrings.ToolName}] 退避フォルダの削除に失敗しました（手動で削除してください）: {ex.Message}");
+                    $"[{AknStrings.ToolName}] 退避フォルダの削除に失敗しました（手動で削除してください）: {ex.Message}");
                 return false;
             }
         }
@@ -210,6 +323,43 @@ namespace Maaaaa.Akm.Editor
         public static bool HasManifest(string folderAbs)
         {
             return File.Exists(Path.Combine(folderAbs, ManifestFileName));
+        }
+
+        /// <summary>プロジェクト直下の退避フォルダを新しい順に列挙する。非破壊。</summary>
+        public static List<TrashFolderInfo> FindTrashFolders()
+        {
+            var folders = new List<TrashFolderInfo>();
+            try
+            {
+                foreach (var path in Directory.GetDirectories(AknUtil.ProjectRoot, TrashPrefix + "*",
+                    SearchOption.TopDirectoryOnly))
+                {
+                    var absPath = AknUtil.Normalize(path);
+                    if (!HasManifest(absPath)) continue;
+
+                    var manifest = ReadManifest(absPath);
+                    var name = Path.GetFileName(absPath);
+                    folders.Add(new TrashFolderInfo
+                    {
+                        AbsPath = absPath,
+                        CreatedAt = !string.IsNullOrEmpty(manifest?.createdAt)
+                            ? manifest.createdAt
+                            : name.Substring(TrashPrefix.Length),
+                        EntryCount = manifest?.entries?.Count ?? 0,
+                        SizeBytes = AknUtil.DirectorySize(absPath),
+                        HasBackupPackage = File.Exists(Path.Combine(absPath, BackupPackageName)),
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[{AknStrings.ToolName}] {string.Format(AknStrings.RestoreTrashFoldersFindFailedFormat, ex.Message)}");
+            }
+
+            return folders
+                .OrderByDescending(folder => folder.CreatedAt, StringComparer.Ordinal)
+                .ThenByDescending(folder => Path.GetFileName(folder.AbsPath), StringComparer.Ordinal)
+                .ToList();
         }
 
         /// <summary>
@@ -221,18 +371,18 @@ namespace Maaaaa.Akm.Editor
             try
             {
                 EditorUtility.DisplayProgressBar(
-                    AkmStrings.ToolName, AkmStrings.ProgressExportPackage, 0f);
+                    AknStrings.ToolName, AknStrings.ProgressExportPackage, 0f);
                 var paths = targets.Select(t => t.UnitPath)
                     .Where(p => !string.IsNullOrEmpty(p)).Distinct().ToArray();
                 if (paths.Length == 0) return null;
 
-                var outPath = AkmUtil.Normalize(Path.Combine(trashRoot, BackupPackageName));
+                var outPath = AknUtil.Normalize(Path.Combine(trashRoot, BackupPackageName));
                 AssetDatabase.ExportPackage(paths, outPath, ExportPackageOptions.Recurse);
                 return outPath;
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[{AkmStrings.ToolName}] .unitypackage の書き出しに失敗しました: {ex.Message}");
+                Debug.LogWarning($"[{AknStrings.ToolName}] .unitypackage の書き出しに失敗しました: {ex.Message}");
                 return null;
             }
             finally
@@ -249,7 +399,7 @@ namespace Maaaaa.Akm.Editor
             var manifest = ReadManifest(trashRootAbs);
             if (manifest == null) return false;
             count = manifest.entries.Count;
-            sizeBytes = AkmUtil.DirectorySize(trashRootAbs);
+            sizeBytes = AknUtil.DirectorySize(trashRootAbs);
             return true;
         }
 
@@ -262,7 +412,7 @@ namespace Maaaaa.Akm.Editor
             error = null;
             if (!HasManifest(trashRootAbs))
             {
-                error = AkmStrings.PurgeNotTrashFolder;
+                error = AknStrings.PurgeNotTrashFolder;
                 return false;
             }
             try
@@ -275,7 +425,7 @@ namespace Maaaaa.Akm.Editor
             catch (Exception ex)
             {
                 error = ex.Message;
-                Debug.LogWarning($"[{AkmStrings.ToolName}] 退避フォルダの完全削除に失敗: {ex.Message}");
+                Debug.LogWarning($"[{AknStrings.ToolName}] 退避フォルダの完全削除に失敗: {ex.Message}");
                 return false;
             }
         }
@@ -307,7 +457,7 @@ namespace Maaaaa.Akm.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[{AkmStrings.ToolName}] マニフェスト読み込み失敗: {ex.Message}");
+                Debug.LogError($"[{AknStrings.ToolName}] マニフェスト読み込み失敗: {ex.Message}");
                 return null;
             }
         }

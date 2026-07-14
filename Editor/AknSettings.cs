@@ -3,13 +3,13 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>
     /// 設定の永続化。
     /// Assets/Asset-Keshichaumon-Nator/Settings.asset に保存する。
     /// </summary>
-    internal class AkmSettings : ScriptableObject
+    internal class AknSettings : ScriptableObject
     {
         public const string SettingsFolder = "Assets/Asset-Keshichaumon-Nator";
         public const string SettingsPath = SettingsFolder + "/Settings.asset";
@@ -25,6 +25,9 @@ namespace Maaaaa.Akm.Editor
 
         [Tooltip("ユーザーホワイトリスト（glob パターン）。マッチしたパスは常に保護する")]
         public List<string> userWhitelistGlobs = new List<string>();
+
+        [Tooltip("未使用スキャンの対象範囲（Assets 配下のフォルダのアセットパス）。空ならプロジェクト全体")]
+        public List<string> scanScopeDirectories = new List<string>();
 
         [Tooltip("導入単位フォルダとみなす深度（Assets からの階層数）。既定 2")]
         public int granularityDepth = 2;
@@ -47,16 +50,16 @@ namespace Maaaaa.Akm.Editor
         [Tooltip("前回スキャン日時")]
         public string lastScanTime = "";
 
-        private static AkmSettings _cached;
+        private static AknSettings _cached;
 
-        public static AkmSettings GetOrCreate()
+        public static AknSettings GetOrCreate()
         {
             if (_cached != null) return _cached;
 
-            var settings = AssetDatabase.LoadAssetAtPath<AkmSettings>(SettingsPath);
+            var settings = AssetDatabase.LoadAssetAtPath<AknSettings>(SettingsPath);
             if (settings == null)
             {
-                settings = CreateInstance<AkmSettings>();
+                settings = CreateInstance<AknSettings>();
                 if (!AssetDatabase.IsValidFolder(SettingsFolder))
                 {
                     // Assets/Asset-Keshichaumon-Nator を作成

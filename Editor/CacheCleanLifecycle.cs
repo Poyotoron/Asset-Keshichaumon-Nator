@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>
     /// キャッシュ掃除のライフサイクル管理。
@@ -35,11 +35,11 @@ namespace Maaaaa.Akm.Editor
 
             // 予約状態での終了時、再度警告し、この時点でキャンセルできるようにする。
             int choice = EditorUtility.DisplayDialogComplex(
-                AkmStrings.CacheQuitWarnTitle,
-                AkmStrings.CacheQuitWarnMessage,
-                AkmStrings.CacheQuitProceed,          // 0: 掃除して終了
-                AkmStrings.CacheQuitAbort,            // 1: 終了しない
-                AkmStrings.CacheQuitCancelReservation // 2: 予約を取り消して終了
+                AknStrings.CacheQuitWarnTitle,
+                AknStrings.CacheQuitWarnMessage,
+                AknStrings.CacheQuitProceed,          // 0: 掃除して終了
+                AknStrings.CacheQuitAbort,            // 1: 終了しない
+                AknStrings.CacheQuitCancelReservation // 2: 予約を取り消して終了
             );
 
             switch (choice)
@@ -66,7 +66,7 @@ namespace Maaaaa.Akm.Editor
 
         // SessionState はドメインリロードを跨いで保持され、Unity 再起動でクリアされる。
         // これにより「真の起動」と「スクリプト再コンパイルによるドメインリロード」を区別する。
-        private const string SessionStartedKey = "net.maaaaa.akm.cacheSessionVerified";
+        private const string SessionStartedKey = "net.maaaaa.akn.cacheSessionVerified";
 
         private static void VerifyOnStartup()
         {
@@ -88,7 +88,7 @@ namespace Maaaaa.Akm.Editor
                 CacheClean.AppendLog("leftover reservation detected on startup (previous clean did not run).");
                 CacheClean.CancelReservation();
                 EditorUtility.DisplayDialog(
-                    AkmStrings.CacheLeftoverTitle, AkmStrings.CacheLeftoverMessage, AkmStrings.Ok);
+                    AknStrings.CacheLeftoverTitle, AknStrings.CacheLeftoverMessage, AknStrings.Ok);
             }
         }
 
@@ -107,7 +107,7 @@ namespace Maaaaa.Akm.Editor
             // 明らかに異常（極端に長い/負）は捨てる。
             if (measured < 1 || measured > 6 * 3600) measured = 0;
 
-            var settings = AkmSettings.GetOrCreate();
+            var settings = AknSettings.GetOrCreate();
             if (measured > 0)
             {
                 settings.lastReimportSeconds = measured;
@@ -121,10 +121,10 @@ namespace Maaaaa.Akm.Editor
 
             CacheClean.ClearDoneMarker();
 
-            var msg = AkmStrings.CacheJustCleanedMessage;
+            var msg = AknStrings.CacheJustCleanedMessage;
             if (measured > 0)
-                msg += string.Format(AkmStrings.CacheJustCleanedMeasuredFormat, AkmUtil.HumanDuration(measured));
-            EditorUtility.DisplayDialog(AkmStrings.CacheJustCleanedTitle, msg, AkmStrings.Ok);
+                msg += string.Format(AknStrings.CacheJustCleanedMeasuredFormat, AknUtil.HumanDuration(measured));
+            EditorUtility.DisplayDialog(AknStrings.CacheJustCleanedTitle, msg, AknStrings.Ok);
         }
     }
 }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>
     /// 中核アルゴリズム。GC の Mark &amp; Sweep と同型。
@@ -16,16 +16,20 @@ namespace Maaaaa.Akm.Editor
     /// </summary>
     internal static class UnusedAssetScanner
     {
-        public static ScanResult Scan(AkmSettings settings, RootSet roots)
+        public static ScanResult Scan(AknSettings settings, RootSet roots)
         {
-            var result = new ScanResult { RootCount = roots.AvatarRoots.Count };
+            var result = new ScanResult
+            {
+                RootCount = roots.AvatarRoots.Count,
+                ScopeDirectories = new List<string>(settings.scanScopeDirectories),
+            };
 
             // --- Mark: ルートからの到達集合（キャッシュ利用）---
-            EditorUtility.DisplayProgressBar(AkmStrings.ProgressTitle, AkmStrings.ProgressBuildReachable, 0.2f);
+            EditorUtility.DisplayProgressBar(AknStrings.ProgressTitle, AknStrings.ProgressBuildReachable, 0.2f);
             var reachable = DependencyCache.GetReachable(roots.AllRoots);
 
             // --- 全アセット列挙（Assets 配下のファイルのみ）---
-            EditorUtility.DisplayProgressBar(AkmStrings.ProgressTitle, AkmStrings.ProgressEnumerate, 0.4f);
+            EditorUtility.DisplayProgressBar(AknStrings.ProgressTitle, AknStrings.ProgressEnumerate, 0.4f);
             var allFiles = new List<string>();
             foreach (var path in AssetDatabase.GetAllAssetPaths())
             {
@@ -39,7 +43,7 @@ namespace Maaaaa.Akm.Editor
             // ファイル単位モードでも、保護判定は「そのファイルが属する導入単位フォルダの中身」を
             // 文脈として使う。これによりコード/シェーダーを含むフォルダ内の個別ファイルも保護され、
             // 「迷ったら保護」の安全性を保ったまま列挙粒度だけを細かくできる。
-            EditorUtility.DisplayProgressBar(AkmStrings.ProgressTitle, AkmStrings.ProgressClassify, 0.6f);
+            EditorUtility.DisplayProgressBar(AknStrings.ProgressTitle, AknStrings.ProgressClassify, 0.6f);
             var unitOf = new UnitResolver(settings, allFiles);
             var folderUnits = new Dictionary<string, List<string>>();
             var folderUnitOf = new Dictionary<string, string>();
@@ -59,17 +63,23 @@ namespace Maaaaa.Akm.Editor
 
             if (settings.fileUnitMode)
             {
-                result.TotalUnits = allFiles.Count;
                 int fi = 0;
                 foreach (var f in allFiles)
                 {
                     if ((fi++ & 255) == 0)
                     {
                         EditorUtility.DisplayProgressBar(
-                            AkmStrings.ProgressTitle, AkmStrings.ProgressClassify,
+                            AknStrings.ProgressTitle, AknStrings.ProgressClassify,
                             0.6f + 0.4f * fi / Math.Max(1, allFiles.Count));
                     }
 
+                    if (!IsInScope(f, settings.scanScopeDirectories))
+                    {
+                        result.OutOfScopeUnits++;
+                        continue;
+                    }
+
+                    result.TotalUnits++;
                     if (reachable.Contains(f)) { result.UsedUnits++; continue; }
 
                     // 保護文脈 = このファイルが属する導入単位フォルダの中身
@@ -85,29 +95,36 @@ namespace Maaaaa.Akm.Editor
                     {
                         UnitPath = f,
                         ContainedFiles = single,
-                        SizeBytes = AkmUtil.FileSize(f),
+                        SizeBytes = AknUtil.FileSize(f),
                         Kind = ComputeKind(single, out var kd),
                         KindDetail = kd,
-                        Reason = AkmStrings.ReasonUnreachable,
+                        Reason = AknStrings.ReasonUnreachable,
                         Selected = false,
                     });
                 }
             }
             else
             {
-                result.TotalUnits = folderUnits.Count;
                 int i = 0;
                 foreach (var kv in folderUnits)
                 {
                     if ((i++ & 63) == 0)
                     {
                         EditorUtility.DisplayProgressBar(
-                            AkmStrings.ProgressTitle, AkmStrings.ProgressClassify,
+                            AknStrings.ProgressTitle, AknStrings.ProgressClassify,
                             0.6f + 0.4f * i / folderUnits.Count);
                     }
 
                     var unitPath = kv.Key;
                     var files = kv.Value;
+
+                    if (!IsInScope(unitPath, settings.scanScopeDirectories))
+                    {
+                        result.OutOfScopeUnits++;
+                        continue;
+                    }
+
+                    result.TotalUnits++;
 
                     // 使用中: フォルダ内に到達アセットが1つでもあれば使用中とみなす
                     if (files.Any(f => reachable.Contains(f))) { result.UsedUnits++; continue; }
@@ -123,10 +140,10 @@ namespace Maaaaa.Akm.Editor
                     {
                         UnitPath = unitPath,
                         ContainedFiles = files,
-                        SizeBytes = files.Sum(AkmUtil.FileSize),
+                        SizeBytes = files.Sum(AknUtil.FileSize),
                         Kind = ComputeKind(files, out var kindDetail),
                         KindDetail = kindDetail,
-                        Reason = AkmStrings.ReasonUnreachable,
+                        Reason = AknStrings.ReasonUnreachable,
                         Selected = false, // 既定は全選択 OFF（明示選択させる）
                     });
                 }
@@ -135,6 +152,13 @@ namespace Maaaaa.Akm.Editor
             // サイズ降順ソートを既定にする
             result.Candidates.Sort((a, b) => b.SizeBytes.CompareTo(a.SizeBytes));
             return result;
+        }
+
+        private static bool IsInScope(string path, List<string> scopeDirectories)
+        {
+            if (scopeDirectories == null || scopeDirectories.Count == 0) return true;
+            return scopeDirectories.Any(scope =>
+                path == scope || path.StartsWith(scope + "/", StringComparison.Ordinal));
         }
 
         // 内訳表示の並び順
@@ -153,20 +177,20 @@ namespace Maaaaa.Akm.Editor
             var counts = new Dictionary<AssetKind, int>();
             foreach (var f in files)
             {
-                var k = AkmUtil.ClassifyKind(f);
+                var k = AknUtil.ClassifyKind(f);
                 if (k == AssetKind.Other) continue;
                 counts[k] = counts.TryGetValue(k, out var c) ? c + 1 : 1;
             }
 
             if (counts.Count == 0)
             {
-                detail = AkmUtil.KindLabel(AssetKind.Other);
+                detail = AknUtil.KindLabel(AssetKind.Other);
                 return AssetKind.Other;
             }
 
             detail = string.Join(", ", KindDetailOrder
                 .Where(counts.ContainsKey)
-                .Select(k => $"{AkmUtil.KindLabel(k)} {counts[k]}"));
+                .Select(k => $"{AknUtil.KindLabel(k)} {counts[k]}"));
 
             // 2 種類以上の意味のある種別が混ざっていれば「混在」
             return counts.Count >= 2 ? AssetKind.Mixed : counts.Keys.First();
@@ -180,14 +204,14 @@ namespace Maaaaa.Akm.Editor
     /// </summary>
     internal class UnitResolver
     {
-        private readonly AkmSettings _settings;
+        private readonly AknSettings _settings;
 
         // 自動推定用: 各フォルダの直下ファイル有無 / 直下子フォルダ集合
         private readonly HashSet<string> _foldersWithDirectFiles = new HashSet<string>();
         private readonly Dictionary<string, HashSet<string>> _childFolders =
             new Dictionary<string, HashSet<string>>();
 
-        public UnitResolver(AkmSettings settings, List<string> allFiles)
+        public UnitResolver(AknSettings settings, List<string> allFiles)
         {
             _settings = settings;
             if (settings.autoEstimateGranularity)

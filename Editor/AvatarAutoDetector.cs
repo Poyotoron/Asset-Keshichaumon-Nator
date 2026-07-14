@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>
     /// VRCAvatarDescriptor を持つ Prefab を検索する（アバターの自動検出）。

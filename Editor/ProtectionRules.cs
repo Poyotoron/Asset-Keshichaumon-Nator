@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>
     /// 保護集合。ツール・シェーダー・コード資産を退避対象から除外する。
@@ -51,7 +51,7 @@ namespace Maaaaa.Akm.Editor
         /// <summary>ファイル単位で常に保護される拡張子か。</summary>
         public static bool IsAlwaysProtectedFile(string assetPath)
         {
-            return AlwaysProtectedExtensions.Contains(AkmUtil.Ext(assetPath));
+            return AlwaysProtectedExtensions.Contains(AknUtil.Ext(assetPath));
         }
 
         /// <summary>
@@ -68,8 +68,8 @@ namespace Maaaaa.Akm.Editor
             out string reason)
         {
             // 本ツール自身の設定フォルダは常に保護（自己言及の回避）
-            if (unitPath == AkmSettings.SettingsFolder ||
-                unitPath.StartsWith(AkmSettings.SettingsFolder + "/"))
+            if (unitPath == AknSettings.SettingsFolder ||
+                unitPath.StartsWith(AknSettings.SettingsFolder + "/"))
             {
                 reason = "本ツールの設定フォルダ";
                 return true;
@@ -104,7 +104,7 @@ namespace Maaaaa.Akm.Editor
             // 構造ヒューリスティック（コード・シェーダー・パッケージを含む）
             foreach (var file in containedFiles)
             {
-                var ext = AkmUtil.Ext(file);
+                var ext = AknUtil.Ext(file);
                 if (StructureProtectExtensions.Contains(ext))
                 {
                     reason = $"コード／シェーダー資産を含む（{ext}）";

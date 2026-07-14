@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>ルート集合の収集結果。</summary>
     internal class RootSet
@@ -37,7 +37,7 @@ namespace Maaaaa.Akm.Editor
             "/StreamingAssets/",
         };
 
-        public static RootSet Collect(AkmSettings settings)
+        public static RootSet Collect(AknSettings settings)
         {
             var set = new RootSet();
             var avatar = new HashSet<string>();
@@ -60,7 +60,7 @@ namespace Maaaaa.Akm.Editor
             // --- 個別ファイル指定 ---
             foreach (var p in settings.additionalRootAssets.Where(a => !string.IsNullOrEmpty(a)))
             {
-                var ext = AkmUtil.Ext(p);
+                var ext = AknUtil.Ext(p);
                 if (ext == ".prefab" || ext == ".unity")
                 {
                     avatar.Add(p);
@@ -77,7 +77,7 @@ namespace Maaaaa.Akm.Editor
             // --- Build Settings の有効な Scene もアバター系ルート扱い ---
             foreach (var scene in EditorBuildSettings.scenes)
             {
-                if (scene.enabled && !string.IsNullOrEmpty(scene.path) && File.Exists(AkmUtil.ToAbsolute(scene.path)))
+                if (scene.enabled && !string.IsNullOrEmpty(scene.path) && File.Exists(AknUtil.ToAbsolute(scene.path)))
                 {
                     avatar.Add(scene.path);
                 }
@@ -105,7 +105,7 @@ namespace Maaaaa.Akm.Editor
             foreach (var guid in guids)
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
-                var ext = AkmUtil.Ext(path);
+                var ext = AknUtil.Ext(path);
                 if (ext == ".prefab" || ext == ".unity")
                 {
                     yield return path;
@@ -129,7 +129,7 @@ namespace Maaaaa.Akm.Editor
                 }
 
                 // Assets 直下の *.asset（設定系 ScriptableObject の可能性）
-                if (AkmUtil.Ext(path) == ".asset")
+                if (AknUtil.Ext(path) == ".asset")
                 {
                     // "Assets/xxx.asset" のように直下だけを対象
                     var rel = path.Substring("Assets/".Length);
