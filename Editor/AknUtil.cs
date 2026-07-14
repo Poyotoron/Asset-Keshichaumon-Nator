@@ -1,12 +1,13 @@
 using System;
+using System.Globalization;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>汎用ユーティリティ。パス変換・サイズ計算など。</summary>
-    internal static class AkmUtil
+    internal static class AknUtil
     {
         /// <summary>プロジェクトルート（Assets の親）の絶対パス。区切りは '/'。</summary>
         public static string ProjectRoot
@@ -29,6 +30,27 @@ namespace Maaaaa.Akm.Editor
         public static string ToAbsolute(string assetPath)
         {
             return Normalize(Path.Combine(ProjectRoot, assetPath));
+        }
+
+        /// <summary>絶対パスをプロジェクトルート基準のアセットパスへ変換する。</summary>
+        public static string ToAssetPath(string absolutePath)
+        {
+            absolutePath = Normalize(absolutePath);
+            var projectRoot = ProjectRoot;
+            return absolutePath.StartsWith(projectRoot + "/")
+                ? absolutePath.Substring(projectRoot.Length + 1)
+                : null;
+        }
+
+        /// <summary>退避日時を読みやすい表記にする。</summary>
+        public static string HumanDateTime(string value)
+        {
+            if (DateTime.TryParseExact(value, "yyyyMMdd_HHmmss", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var dateTime))
+            {
+                return dateTime.ToString("yyyy-MM-dd HH:mm:ss");
+            }
+            return value;
         }
 
         /// <summary>人間可読なサイズ表記。</summary>

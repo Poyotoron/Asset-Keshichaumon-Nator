@@ -3,7 +3,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>
     /// キャッシュ掃除の二段階確認ウィンドウ。
@@ -30,8 +30,8 @@ namespace Maaaaa.Akm.Editor
         {
             var w = CreateInstance<CacheCleanConfirmWindow>();
             w.titleContent = new GUIContent(mode == Mode.Reserve
-                ? AkmStrings.CacheReserveButton
-                : AkmStrings.CacheCleanNowButton);
+                ? AknStrings.CacheReserveButton
+                : AknStrings.CacheCleanNowButton);
             w._mode = mode;
             w._targets = targets;
             w._libSize = libSize;
@@ -46,41 +46,41 @@ namespace Maaaaa.Akm.Editor
         {
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
-            EditorGUILayout.LabelField(AkmStrings.CacheHeader, EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(AknStrings.CacheHeader, EditorStyles.boldLabel);
 
             // 目立つ警告
-            EditorGUILayout.HelpBox(AkmStrings.CacheWarnMain, MessageType.Warning);
+            EditorGUILayout.HelpBox(AknStrings.CacheWarnMain, MessageType.Warning);
 
             // 数値の根拠
             EditorGUILayout.HelpBox(string.Format(
-                AkmStrings.CacheStatsFormat,
-                AkmUtil.HumanSize(_libSize),
+                AknStrings.CacheStatsFormat,
+                AknUtil.HumanSize(_libSize),
                 _assetCount,
-                AkmUtil.HumanSize(_assetSize)), MessageType.Info);
+                AknUtil.HumanSize(_assetSize)), MessageType.Info);
 
             // 所要時間の目安（実測があれば優先）
             if (_measuredReimport > 0)
             {
                 EditorGUILayout.HelpBox(string.Format(
-                    AkmStrings.CacheTimeEstimateMeasuredFormat,
-                    AkmUtil.HumanDuration(_measuredReimport)), MessageType.Info);
+                    AknStrings.CacheTimeEstimateMeasuredFormat,
+                    AknUtil.HumanDuration(_measuredReimport)), MessageType.Info);
             }
-            EditorGUILayout.HelpBox(AkmStrings.CacheTimeEstimateGeneric, MessageType.None);
+            EditorGUILayout.HelpBox(AknStrings.CacheTimeEstimateGeneric, MessageType.None);
 
             // 削除対象を全件列挙
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField(AkmStrings.CacheTargetsHeader, EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(AknStrings.CacheTargetsHeader, EditorStyles.boldLabel);
             foreach (var t in _targets.Where(t => t.Enabled))
             {
-                var size = t.SizeBytes >= 0 ? AkmUtil.HumanSize(t.SizeBytes) : "未計測";
+                var size = t.SizeBytes >= 0 ? AknUtil.HumanSize(t.SizeBytes) : "未計測";
                 EditorGUILayout.LabelField($"・{t.RelativePath}/   （{size}{(t.Exists ? "" : " / 無し")}）",
                     EditorStyles.miniLabel);
             }
-            EditorGUILayout.LabelField(AkmStrings.CacheTargetsCsprojNote, EditorStyles.miniLabel);
+            EditorGUILayout.LabelField(AknStrings.CacheTargetsCsprojNote, EditorStyles.miniLabel);
 
             // 実行タイミング助言
             EditorGUILayout.Space();
-            EditorGUILayout.HelpBox(AkmStrings.CacheTimingAdvice, MessageType.None);
+            EditorGUILayout.HelpBox(AknStrings.CacheTimingAdvice, MessageType.None);
 
             EditorGUILayout.EndScrollView();
 
@@ -93,12 +93,12 @@ namespace Maaaaa.Akm.Editor
         {
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button(AkmStrings.Cancel, GUILayout.Height(28)))
+                if (GUILayout.Button(AknStrings.Cancel, GUILayout.Height(28)))
                 {
                     Close();
                     GUIUtility.ExitGUI();
                 }
-                if (GUILayout.Button(AkmStrings.CacheNextButton, GUILayout.Height(28)))
+                if (GUILayout.Button(AknStrings.CacheNextButton, GUILayout.Height(28)))
                 {
                     _step = 2;
                 }
@@ -107,14 +107,14 @@ namespace Maaaaa.Akm.Editor
 
         private void DrawStage2()
         {
-            EditorGUILayout.LabelField(AkmStrings.CacheConfirmStage2Title, EditorStyles.boldLabel);
+            EditorGUILayout.LabelField(AknStrings.CacheConfirmStage2Title, EditorStyles.boldLabel);
 
             // チェックしなければ実行ボタンを有効化しない
-            _ack = EditorGUILayout.ToggleLeft(AkmStrings.CacheAckCheckbox, _ack);
+            _ack = EditorGUILayout.ToggleLeft(AknStrings.CacheAckCheckbox, _ack);
 
             using (new EditorGUILayout.HorizontalScope())
             {
-                if (GUILayout.Button(AkmStrings.Cancel, GUILayout.Height(28)))
+                if (GUILayout.Button(AknStrings.Cancel, GUILayout.Height(28)))
                 {
                     Close();
                     GUIUtility.ExitGUI();
@@ -122,8 +122,8 @@ namespace Maaaaa.Akm.Editor
                 using (new EditorGUI.DisabledScope(!_ack))
                 {
                     var label = _mode == Mode.Reserve
-                        ? AkmStrings.CacheReserveConfirmButton
-                        : AkmStrings.CacheCleanNowConfirmButton;
+                        ? AknStrings.CacheReserveConfirmButton
+                        : AknStrings.CacheCleanNowConfirmButton;
                     if (GUILayout.Button(label, GUILayout.Height(28)))
                     {
                         Execute();
@@ -141,10 +141,10 @@ namespace Maaaaa.Akm.Editor
                 var pending = CacheClean.ReadPending();
                 Close();
                 EditorUtility.DisplayDialog(
-                    AkmStrings.ToolName,
-                    string.Format(AkmStrings.CacheReservedDialogFormat,
-                        string.Format(AkmStrings.CacheReservedNoteFormat, pending?.reservedAt ?? "")),
-                    AkmStrings.Ok);
+                    AknStrings.ToolName,
+                    string.Format(AknStrings.CacheReservedDialogFormat,
+                        string.Format(AknStrings.CacheReservedNoteFormat, pending?.reservedAt ?? "")),
+                    AknStrings.Ok);
                 GUIUtility.ExitGUI();
             }
             else // CleanNow: 予約 + ヘルパー起動 + 即 Exit

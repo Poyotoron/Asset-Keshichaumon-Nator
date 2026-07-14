@@ -1,6 +1,6 @@
 {
-    "name": "net.maaaaa.akm.Editor",
-    "rootNamespace": "Maaaaa.Akm.Editor",
+    "name": "net.maaaaa.akn.Editor",
+    "rootNamespace": "Maaaaa.Akn.Editor",
     "references": [
         ""
     ],

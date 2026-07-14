@@ -1,10 +1,10 @@
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>
     /// ユーザーに見える日本語文字列を一箇所に集約する（将来の多言語化のため）。
     /// コーディング規約: 文字列はここに集める。
     /// </summary>
-    internal static class AkmStrings
+    internal static class AknStrings
     {
         // ---- ツール識別 ----
         public const string ToolName = "いらないアセット消しちゃうもんネーター";
@@ -34,6 +34,8 @@ namespace Maaaaa.Akm.Editor
         public const string RootsAutoDetectNone = "自動検出されたアバターはありません（または VRChat SDK 未導入）。";
         public const string RootsAutoDetectExcludeHint = "チェックを外すとルートから除外されます。";
         public const string RemoveButton = "削除";
+        public const string RootsUnregistered = "（未登録）";
+        public const string AssetsFolderRequired = "Assets/ 配下のフォルダを選択してください。";
 
         // ---- Protection タブ ----
         public const string ProtHeader = "保護ルール";
@@ -50,6 +52,15 @@ namespace Maaaaa.Akm.Editor
         public const string ProtWhitelistPlaceholder = "Assets/…/**";
 
         // ---- Scan タブ ----
+        public const string ScanScopeHeader = "スキャン範囲";
+        public const string ScanScopeHelp =
+            "範囲を指定しても、参照の解析は常にプロジェクト全体で行います。範囲外のアバターから使われているアセットが、範囲を絞ったせいで未使用と判定されることはありません。";
+        public const string ScanScopeDropArea = "ここに対象フォルダをドラッグ＆ドロップ";
+        public const string ScanScopeSelectFolder = "フォルダを選択して追加";
+        public const string ScanScopeUnconfigured = "（未設定 — プロジェクト全体を対象）";
+        public const string ScanScopeSummaryFormat = "スキャン範囲: {0}（範囲外 {1} 単位は判定していません）";
+        public const string ScanScopeNoUnitsWarning =
+            "指定した範囲に判定単位が1つもありません。指定したフォルダが、判定単位（導入単位フォルダ）より深い可能性があります。範囲をもう少し浅いフォルダにするか、判定粒度の設定を見直してください。";
         public const string ScanButton = "スキャン実行（非破壊）";
         public const string ScanNoRootsError =
             "ルート（アバター Prefab / Scene）が1つも見つかりません。\n" +
@@ -86,7 +97,11 @@ namespace Maaaaa.Akm.Editor
             "{0} 件を退避しました。\n退避先: {1}\n\n" +
             "・Console に Missing 参照の警告が出ていないか確認してください。\n" +
             "・問題があれば「復元」から元に戻せます。";
+        public const string RelocateFoldFoldersConfirmFormat =
+            "\n\n空になる {0} 個のフォルダも一緒に畳みます（復元で元に戻せます）。";
+        public const string RelocateFoldFoldersDoneFormat = "\n空になったフォルダを {0} 件畳みました。";
         public const string RelocateDoneTitle = "退避完了";
+        public const string RestoreMetaAlreadyExistsFormat = "復元先の .meta が既に存在します。スキップ: {0}";
 
         public const string RestoreHeader = "退避したアセットの復元";
         public const string RestoreHelp =
@@ -100,7 +115,18 @@ namespace Maaaaa.Akm.Editor
         public const string RestoreFolderKept =
             "\n一部が戻せなかったため、退避フォルダは残しています（残りの内容を確認してください）。";
         public const string RestoreInvalidFolder =
-            "選択したフォルダに退避マッピング（.akm-relocation.json）が見つかりません。";
+            "選択したフォルダに退避マッピング（.akn-relocation.json）が見つかりません。";
+        public const string RestoreTrashFoldersHeader = "退避済みフォルダ";
+        public const string RestoreTrashFoldersHelp =
+            "プロジェクト直下にある退避フォルダを一覧表示します。復元または完全削除できます。";
+        public const string RestoreTrashFoldersRefresh = "再検出";
+        public const string RestoreTrashFoldersEmpty = "退避済みフォルダはありません。";
+        public const string RestoreTrashFoldersEntryFormat = "退避日時: {0}   /   {1} 件   /   {2}";
+        public const string RestoreTrashFoldersBackup = "backup.unitypackage あり";
+        public const string RestoreTrashFoldersReveal = "フォルダを開く";
+        public const string RestoreTrashFoldersRestore = "復元";
+        public const string RestoreTrashFoldersPurge = "完全削除";
+        public const string RestoreTrashFoldersFindFailedFormat = "退避フォルダの列挙に失敗しました: {0}";
 
         // ---- 進捗 ----
         public const string ProgressTitle = "スキャン中…";
@@ -141,7 +167,7 @@ namespace Maaaaa.Akm.Editor
         public const string PurgeConfirmProceed = "完全に削除する";
         public const string PurgeDoneFormat = "退避フォルダを完全に削除しました:\n{0}";
         public const string PurgeNotTrashFolder =
-            "選択したフォルダは本ツールの退避フォルダ（.akm-relocation.json を含む）ではありません。\n" +
+            "選択したフォルダは本ツールの退避フォルダ（.akn-relocation.json を含む）ではありません。\n" +
             "安全のため、退避フォルダ以外は完全削除できません。";
         public const string PurgeFailedFormat = "削除に失敗しました: {0}";
 

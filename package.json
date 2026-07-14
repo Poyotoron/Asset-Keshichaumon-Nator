@@ -1,7 +1,7 @@
 {
   "name": "net.maaaaa.asset-keshichaumon-nator",
   "displayName": "いらないアセット消しちゃうもんネーター",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "アバターから参照されていない未使用アセットを検出し、安全に退避します。",
   "unity": "2022.3",
   "license": "MIT",
@@ -9,7 +9,7 @@
     "name": "Poyotoron",
     "url": "https://github.com/Poyotoron"
   },
-  "url": "https://github.com/Poyotoron/Asset-Keshichaumon-Nator/releases/download/0.2.0/net.maaaaa.asset-keshichaumon-nator-0.2.0.zip",
+  "url": "https://github.com/Poyotoron/Asset-Keshichaumon-Nator/releases/download/0.3.0/net.maaaaa.asset-keshichaumon-nator-0.3.0.zip",
   "vpmDependencies": {
     "com.vrchat.avatars": ">=3.7.0"
   },

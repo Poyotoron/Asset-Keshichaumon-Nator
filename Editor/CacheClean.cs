@@ -8,7 +8,7 @@ using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>
     /// ビルドキャッシュ掃除の中核。
@@ -19,16 +19,16 @@ namespace Maaaaa.Akm.Editor
     ///   したがって「予約 → 終了時に外部ヘルパープロセスを detached 起動 → ヘルパーが PID 終了を待って削除」
     ///   という方式を採る。ヘルパーは PowerShell スクリプト（Windows 専用）。
     ///
-    /// 予約・完了フラグは削除対象外かつ再インポートを誘発しない領域（ProjectRoot/.akm/）に置く。
+    /// 予約・完了フラグは削除対象外かつ再インポートを誘発しない領域（ProjectRoot/.akn/）に置く。
     /// </summary>
     internal static class CacheClean
     {
-        // ---- .akm/ 配下のフラグ / ログ（Library・Assets の外に置く）----
-        public const string AkmDirName = ".akm";
+        // ---- .akn/ 配下のフラグ / ログ（Library・Assets の外に置く）----
+        public const string AknDirName = ".akn";
         public const string PendingFileName = "pending-clean.json";
         public const string DoneFileName = "clean-done.json";
         public const string LogFileName = "clean-log.txt";
-        public const string HelperFileName = "akm-clean-helper.ps1";
+        public const string HelperFileName = "akn-clean-helper.ps1";
         public const string FallbackBatName = "clean-cache.bat";
 
         public const int HelperTimeoutSeconds = 120;
@@ -47,17 +47,17 @@ namespace Maaaaa.Akm.Editor
 
         // ------------------------------------------------------------ パス
 
-        public static string AkmDir => AkmUtil.Normalize(Path.Combine(AkmUtil.ProjectRoot, AkmDirName));
-        public static string PendingPath => AkmUtil.Normalize(Path.Combine(AkmDir, PendingFileName));
-        public static string DonePath => AkmUtil.Normalize(Path.Combine(AkmDir, DoneFileName));
-        public static string LogPath => AkmUtil.Normalize(Path.Combine(AkmDir, LogFileName));
-        public static string HelperPath => AkmUtil.Normalize(Path.Combine(AkmDir, HelperFileName));
+        public static string AknDir => AknUtil.Normalize(Path.Combine(AknUtil.ProjectRoot, AknDirName));
+        public static string PendingPath => AknUtil.Normalize(Path.Combine(AknDir, PendingFileName));
+        public static string DonePath => AknUtil.Normalize(Path.Combine(AknDir, DoneFileName));
+        public static string LogPath => AknUtil.Normalize(Path.Combine(AknDir, LogFileName));
+        public static string HelperPath => AknUtil.Normalize(Path.Combine(AknDir, HelperFileName));
         public static string FallbackBatPath =>
-            AkmUtil.Normalize(Path.Combine(AkmUtil.ProjectRoot, FallbackBatName));
+            AknUtil.Normalize(Path.Combine(AknUtil.ProjectRoot, FallbackBatName));
 
-        private static void EnsureAkmDir()
+        private static void EnsureAknDir()
         {
-            if (!Directory.Exists(AkmDir)) Directory.CreateDirectory(AkmDir);
+            if (!Directory.Exists(AknDir)) Directory.CreateDirectory(AknDir);
         }
 
         // ------------------------------------------------------------ 削除対象
@@ -76,14 +76,14 @@ namespace Maaaaa.Akm.Editor
         /// 掃除対象フォルダを列挙する（存在するもののみ）。Logs は設定に応じて。
         /// Assets/ Packages/ ProjectSettings/ は絶対に含めない。
         /// </summary>
-        public static List<CacheTarget> EnumerateTargets(AkmSettings settings)
+        public static List<CacheTarget> EnumerateTargets(AknSettings settings)
         {
-            var root = AkmUtil.ProjectRoot;
+            var root = AknUtil.ProjectRoot;
             var list = new List<CacheTarget>();
 
             void Add(string rel, bool enabled)
             {
-                var abs = AkmUtil.Normalize(Path.Combine(root, rel));
+                var abs = AknUtil.Normalize(Path.Combine(root, rel));
                 list.Add(new CacheTarget
                 {
                     RelativePath = rel,
@@ -111,11 +111,11 @@ namespace Maaaaa.Akm.Editor
                 {
                     var t = targets[i];
                     EditorUtility.DisplayProgressBar(
-                        AkmStrings.ToolName,
-                        AkmStrings.ProgressMeasureCache + "\n" + t.RelativePath,
+                        AknStrings.ToolName,
+                        AknStrings.ProgressMeasureCache + "\n" + t.RelativePath,
                         (float)i / Math.Max(1, targets.Count));
                     t.Exists = Directory.Exists(t.AbsPath);
-                    t.SizeBytes = t.Exists ? AkmUtil.DirectorySize(t.AbsPath) : 0;
+                    t.SizeBytes = t.Exists ? AknUtil.DirectorySize(t.AbsPath) : 0;
                 }
             }
             finally
@@ -127,8 +127,8 @@ namespace Maaaaa.Akm.Editor
         /// <summary>Library/ の実測サイズ。</summary>
         public static long MeasureLibrarySize()
         {
-            var abs = AkmUtil.Normalize(Path.Combine(AkmUtil.ProjectRoot, "Library"));
-            return AkmUtil.DirectorySize(abs);
+            var abs = AknUtil.Normalize(Path.Combine(AknUtil.ProjectRoot, "Library"));
+            return AknUtil.DirectorySize(abs);
         }
 
         /// <summary>Assets/ 配下のアセット数と合計サイズ。</summary>
@@ -142,7 +142,7 @@ namespace Maaaaa.Akm.Editor
                 if (p.EndsWith(".meta")) continue;
                 if (AssetDatabase.IsValidFolder(p)) continue;
                 count++;
-                totalBytes += AkmUtil.FileSize(p);
+                totalBytes += AknUtil.FileSize(p);
             }
         }
 
@@ -171,7 +171,7 @@ namespace Maaaaa.Akm.Editor
         /// <summary>掃除を予約する。削除対象は列挙済みの enabled なフォルダ。</summary>
         public static void Reserve(List<CacheTarget> targets)
         {
-            EnsureAkmDir();
+            EnsureAknDir();
             var pending = new PendingClean
             {
                 reservedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
@@ -184,7 +184,7 @@ namespace Maaaaa.Akm.Editor
         public static void CancelReservation()
         {
             try { if (File.Exists(PendingPath)) File.Delete(PendingPath); }
-            catch (Exception ex) { Debug.LogWarning($"[{AkmStrings.ToolName}] 予約解除に失敗: {ex.Message}"); }
+            catch (Exception ex) { Debug.LogWarning($"[{AknStrings.ToolName}] 予約解除に失敗: {ex.Message}"); }
         }
 
         // ------------------------------------------------------------ 完了マーカー
@@ -226,7 +226,7 @@ namespace Maaaaa.Akm.Editor
 
             try
             {
-                EnsureAkmDir();
+                EnsureAknDir();
                 WriteHelperScript(pending);
 
                 int pid = Process.GetCurrentProcess().Id;
@@ -238,7 +238,7 @@ namespace Maaaaa.Akm.Editor
                     UseShellExecute = true,          // 親から独立させる
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
-                    WorkingDirectory = AkmUtil.ProjectRoot,
+                    WorkingDirectory = AknUtil.ProjectRoot,
                 };
                 Process.Start(psi);
                 _helperLaunched = true;
@@ -248,18 +248,18 @@ namespace Maaaaa.Akm.Editor
             {
                 // ここで失敗しても予約フラグは残るので、次回起動時に検知して再提案できる。
                 AppendLog($"helper launch failed: {ex.Message}");
-                Debug.LogError($"[{AkmStrings.ToolName}] キャッシュ掃除ヘルパーの起動に失敗しました: {ex.Message}");
+                Debug.LogError($"[{AknStrings.ToolName}] キャッシュ掃除ヘルパーの起動に失敗しました: {ex.Message}");
             }
         }
 
         private static void WriteHelperScript(PendingClean pending)
         {
-            var proj = AkmUtil.ProjectRoot;
+            var proj = AknUtil.ProjectRoot;
             var sb = new StringBuilder();
             sb.AppendLine("param([int]$UnityPid)");
             sb.AppendLine("$ErrorActionPreference = 'SilentlyContinue'");
             sb.AppendLine($"$proj = '{PsEscape(proj)}'");
-            sb.AppendLine($"$akm = '{PsEscape(AkmDir)}'");
+            sb.AppendLine($"$akn = '{PsEscape(AknDir)}'");
             sb.AppendLine($"$log = '{PsEscape(LogPath)}'");
             sb.AppendLine($"$pending = '{PsEscape(PendingPath)}'");
             sb.AppendLine($"$done = '{PsEscape(DonePath)}'");
@@ -279,7 +279,7 @@ namespace Maaaaa.Akm.Editor
             var targets = pending.targetsRelative ?? new List<string>();
             sb.Append("$targets = @(");
             sb.Append(string.Join(", ", targets.Select(rel =>
-                $"'{PsEscape(AkmUtil.Normalize(Path.Combine(proj, rel)))}'")));
+                $"'{PsEscape(AknUtil.Normalize(Path.Combine(proj, rel)))}'")));
             sb.AppendLine(")");
             sb.AppendLine("foreach ($t in $targets) {");
             sb.AppendLine("  if (Test-Path -LiteralPath $t) {");
@@ -348,7 +348,7 @@ namespace Maaaaa.Akm.Editor
         {
             try
             {
-                EnsureAkmDir();
+                EnsureAknDir();
                 File.AppendAllText(LogPath,
                     $"{DateTime.Now:s} [editor] {message}{Environment.NewLine}");
             }

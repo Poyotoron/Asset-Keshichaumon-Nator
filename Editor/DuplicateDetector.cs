@@ -4,7 +4,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using UnityEditor;
 
-namespace Maaaaa.Akm.Editor
+namespace Maaaaa.Akn.Editor
 {
     /// <summary>重複グループ内の1ファイル。</summary>
     internal class DuplicateFile
@@ -40,7 +40,7 @@ namespace Maaaaa.Akm.Editor
     /// </summary>
     internal static class DuplicateDetector
     {
-        public static DuplicateReport Scan(AkmSettings settings)
+        public static DuplicateReport Scan(AknSettings settings)
         {
             var report = new DuplicateReport();
 
@@ -58,7 +58,7 @@ namespace Maaaaa.Akm.Editor
             catch { /* 判定不能でもレポート自体は出す */ }
 
             // --- 全アセット列挙 + サイズ別グルーピング ---
-            EditorUtility.DisplayProgressBar(AkmStrings.ToolName, AkmStrings.ProgressEnumerate, 0.1f);
+            EditorUtility.DisplayProgressBar(AknStrings.ToolName, AknStrings.ProgressEnumerate, 0.1f);
             var bySize = new Dictionary<long, List<string>>();
             foreach (var path in AssetDatabase.GetAllAssetPaths())
             {
@@ -66,7 +66,7 @@ namespace Maaaaa.Akm.Editor
                 if (path.EndsWith(".meta")) continue;
                 if (AssetDatabase.IsValidFolder(path)) continue;
 
-                long size = AkmUtil.FileSize(path);
+                long size = AknUtil.FileSize(path);
                 if (size <= 0) continue; // 空ファイルは対象外
 
                 if (!bySize.TryGetValue(size, out var list))
@@ -92,11 +92,11 @@ namespace Maaaaa.Akm.Editor
                         if ((hashed++ & 31) == 0)
                         {
                             EditorUtility.DisplayProgressBar(
-                                AkmStrings.ToolName, AkmStrings.ProgressHashing,
+                                AknStrings.ToolName, AknStrings.ProgressHashing,
                                 0.1f + 0.9f * hashed / System.Math.Max(1, totalToHash));
                         }
 
-                        var hash = ComputeSha256(AkmUtil.ToAbsolute(path));
+                        var hash = ComputeSha256(AknUtil.ToAbsolute(path));
                         if (hash == null) continue;
 
                         if (!byHash.TryGetValue(hash, out var group))
