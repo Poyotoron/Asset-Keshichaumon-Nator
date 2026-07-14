@@ -22,6 +22,8 @@ namespace Maaaaa.Akn.Editor
         private Object _individualToAdd;
         private List<string> _autoDetected = new List<string>();
         private bool _autoDetectRun;
+        private RootSet _inspectedRoots;
+        private bool _implicitRootsFoldout = false;
 
         // Protection
         private string _newGlob = "";
@@ -29,6 +31,7 @@ namespace Maaaaa.Akn.Editor
         // Scan
         private ScanResult _result;
         private bool _scanBlocked;
+        private bool _protectedFoldout = false;
         private List<TrashFolderInfo> _trashFolders = new List<TrashFolderInfo>();
 
         // Duplicates
@@ -117,7 +120,7 @@ namespace Maaaaa.Akn.Editor
                 _individualToAdd = EditorGUILayout.ObjectField(_individualToAdd, typeof(Object), false);
                 using (new EditorGUI.DisabledScope(_individualToAdd == null))
                 {
-                    if (GUILayout.Button("追加", GUILayout.Width(60)))
+                    if (GUILayout.Button(AknStrings.AddButton, GUILayout.Width(60)))
                     {
                         var p = AssetDatabase.GetAssetPath(_individualToAdd);
                         var ext = AknUtil.Ext(p);
@@ -133,23 +136,12 @@ namespace Maaaaa.Akn.Editor
                         else
                         {
                             EditorUtility.DisplayDialog(AknStrings.ToolName,
-                                "Prefab または Scene(.unity) を指定してください。", AknStrings.Ok);
+                                AknStrings.RootsInvalidIndividualAsset, AknStrings.Ok);
                         }
                     }
                 }
             }
-            for (int i = _settings.additionalRootAssets.Count - 1; i >= 0; i--)
-            {
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    EditorGUILayout.LabelField(_settings.additionalRootAssets[i]);
-                    if (GUILayout.Button(AknStrings.RemoveButton, GUILayout.Width(60)))
-                    {
-                        _settings.additionalRootAssets.RemoveAt(i);
-                        _settings.Save();
-                    }
-                }
-            }
+            DrawPathList(_settings.additionalRootAssets, AknStrings.RootsUnregistered);
 
             // 自動検出
             EditorGUILayout.Space();
@@ -179,6 +171,42 @@ namespace Maaaaa.Akn.Editor
                             else if (!excluded.Contains(p)) excluded.Add(p);
                             _settings.Save();
                         }
+                    }
+                }
+            }
+
+            EditorGUILayout.Space();
+            string implicitHeader = AknStrings.RootsImplicitHeaderNotInspected;
+            if (_inspectedRoots != null)
+            {
+                int implicitCount = _inspectedRoots.ImplicitRoots.Count +
+                    _inspectedRoots.ExcludedImplicitRoots.Count;
+                implicitHeader = string.Format(AknStrings.RootsImplicitHeaderFormat, implicitCount);
+            }
+            _implicitRootsFoldout = EditorGUILayout.Foldout(_implicitRootsFoldout,
+                implicitHeader);
+            if (_implicitRootsFoldout)
+            {
+                EditorGUILayout.HelpBox(AknStrings.RootsImplicitHelp, MessageType.Info);
+                if (GUILayout.Button(AknStrings.RootsImplicitInspect))
+                    _inspectedRoots = RootCollector.Collect(_settings);
+                if (_inspectedRoots == null)
+                {
+                    EditorGUILayout.LabelField(AknStrings.RootsImplicitNotInspected, EditorStyles.miniLabel);
+                }
+                else
+                {
+                    EditorGUILayout.LabelField(AknStrings.RootsAutoDetectExcludeHint, EditorStyles.miniLabel);
+                    var allImplicit = _inspectedRoots.ImplicitRoots
+                        .Concat(_inspectedRoots.ExcludedImplicitRoots).Distinct().OrderBy(p => p).ToList();
+                    foreach (var p in allImplicit)
+                    {
+                        bool included = !_settings.excludedImplicitRoots.Contains(p);
+                        bool newIncluded = EditorGUILayout.ToggleLeft(p, included);
+                        if (newIncluded == included) continue;
+                        if (newIncluded) _settings.excludedImplicitRoots.Remove(p);
+                        else if (!_settings.excludedImplicitRoots.Contains(p)) _settings.excludedImplicitRoots.Add(p);
+                        _settings.Save();
                     }
                 }
             }
@@ -217,7 +245,7 @@ namespace Maaaaa.Akn.Editor
             if (!AssetDatabase.IsValidFolder(assetPath))
             {
                 EditorUtility.DisplayDialog(AknStrings.ToolName,
-                    "フォルダを指定してください: " + assetPath, AknStrings.Ok);
+                    string.Format(AknStrings.FolderRequiredFormat, assetPath), AknStrings.Ok);
                 return;
             }
             if (assetsOnly && assetPath != "Assets" && !assetPath.StartsWith("Assets/"))
@@ -235,21 +263,50 @@ namespace Maaaaa.Akn.Editor
 
         private void DrawDirectoryList(List<string> directories, string emptyLabel)
         {
+            DrawPathList(directories, emptyLabel);
+        }
+
+        private void DrawPathList(List<string> paths, string emptyLabel)
+        {
             EditorGUILayout.Space();
-            if (directories.Count == 0)
-                EditorGUILayout.LabelField(emptyLabel, EditorStyles.miniLabel);
-            for (int i = directories.Count - 1; i >= 0; i--)
+            int removeIndex = -1;
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                using (new EditorGUILayout.HorizontalScope())
+                EditorGUILayout.LabelField(string.Format(
+                    AknStrings.RegisteredItemsFormat, paths.Count), EditorStyles.miniBoldLabel);
+                if (paths.Count == 0)
                 {
-                    EditorGUILayout.LabelField(directories[i]);
-                    if (GUILayout.Button(AknStrings.RemoveButton, GUILayout.Width(60)))
+                    EditorGUILayout.LabelField(emptyLabel, EditorStyles.miniLabel);
+                }
+                else
+                {
+                    Color separatorColor = EditorGUIUtility.isProSkin
+                        ? new Color(1f, 1f, 1f, 0.10f)
+                        : new Color(0f, 0f, 0f, 0.12f);
+                    for (int i = 0; i < paths.Count; i++)
                     {
-                        directories.RemoveAt(i);
-                        _settings.Save();
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            if (GUILayout.Button(new GUIContent(paths[i], paths[i]),
+                                    EditorStyles.linkLabel, GUILayout.ExpandWidth(true)))
+                                PingPath(paths[i]);
+                            if (GUILayout.Button(AknStrings.RemoveButton, GUILayout.Width(60)))
+                                removeIndex = i;
+                        }
+                        if (i < paths.Count - 1)
+                        {
+                            var separator = GUILayoutUtility.GetRect(0, 1, GUILayout.ExpandWidth(true));
+                            EditorGUI.DrawRect(separator, separatorColor);
+                        }
                     }
                 }
             }
+            if (removeIndex >= 0)
+            {
+                paths.RemoveAt(removeIndex);
+                _settings.Save();
+            }
+            EditorGUILayout.Space();
         }
 
         // ------------------------------------------------------------- Protection
@@ -260,11 +317,7 @@ namespace Maaaaa.Akn.Editor
             EditorGUILayout.HelpBox(AknStrings.ProtHelp, MessageType.Info);
 
             EditorGUILayout.LabelField(AknStrings.ProtStructureHeader, EditorStyles.boldLabel);
-            EditorGUILayout.LabelField(
-                "・.cs / .asmdef / .asmref / .dll / .shader / .hlsl / .cginc / .shadergraph を含む\n" +
-                "・package.json / *.vpm.json を含む\n" +
-                "・Editor/ ディレクトリを持つ",
-                EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.LabelField(AknStrings.ProtStructureDetail, EditorStyles.wordWrappedMiniLabel);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField(AknStrings.ProtToolListHeader, EditorStyles.boldLabel);
@@ -332,15 +385,27 @@ namespace Maaaaa.Akn.Editor
             }
             DrawDirectoryList(_settings.scanScopeDirectories, AknStrings.ScanScopeUnconfigured);
 
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField(AknStrings.ScanToolOutputHeader, EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox(AknStrings.ScanToolOutputHelp, MessageType.Info);
+            DrawDirectoryDropArea(_settings.toolOutputDirectories, AknStrings.ScanToolOutputDropArea, true);
+            if (GUILayout.Button(AknStrings.ScanToolOutputSelectFolder))
+            {
+                var abs = EditorUtility.OpenFolderPanel(AknStrings.ScanToolOutputSelectFolder, Application.dataPath, "");
+                var assetPath = AbsToAssetPath(abs);
+                if (assetPath != null) AddDirectory(_settings.toolOutputDirectories, assetPath, true);
+            }
+            DrawDirectoryList(_settings.toolOutputDirectories, AknStrings.ScanToolOutputUnconfigured);
+
             // 判定粒度設定
             using (new EditorGUILayout.HorizontalScope())
             {
                 EditorGUI.BeginChangeCheck();
                 _settings.autoEstimateGranularity = EditorGUILayout.ToggleLeft(
-                    "導入単位フォルダを自動推定する", _settings.autoEstimateGranularity, GUILayout.Width(220));
+                    AknStrings.ScanAutoGranularityToggle, _settings.autoEstimateGranularity, GUILayout.Width(220));
                 using (new EditorGUI.DisabledScope(_settings.autoEstimateGranularity))
                 {
-                    EditorGUILayout.LabelField("固定深度:", GUILayout.Width(60));
+                    EditorGUILayout.LabelField(AknStrings.ScanFixedDepthLabel, GUILayout.Width(60));
                     _settings.granularityDepth = Mathf.Max(1,
                         EditorGUILayout.IntField(_settings.granularityDepth, GUILayout.Width(40)));
                 }
@@ -416,7 +481,7 @@ namespace Maaaaa.Akn.Editor
                 AknStrings.ScanSummaryFormat,
                 _result.Candidates.Count,
                 AknUtil.HumanSize(_result.TotalCandidateSize),
-                _result.UsedUnits, _result.ProtectedUnits, _result.RootCount),
+                _result.UsedUnits, _result.ProtectedCount, _result.RootCount),
                 EditorStyles.boldLabel);
 
             if (_result.ScopeDirectories.Count > 0)
@@ -426,6 +491,8 @@ namespace Maaaaa.Akn.Editor
                 if (_result.TotalUnits == 0 && _result.OutOfScopeUnits > 0)
                     EditorGUILayout.HelpBox(AknStrings.ScanScopeNoUnitsWarning, MessageType.Warning);
             }
+
+            DrawProtectedEntries();
 
             if (_result.Candidates.Count == 0)
             {
@@ -452,29 +519,37 @@ namespace Maaaaa.Akn.Editor
                 GUILayout.Label(AknStrings.ScanColProtect, GUILayout.Width(90));
             }
 
-            foreach (var e in _result.Candidates)
+            foreach (var group in _result.Candidates.GroupBy(e => e.GroupId))
             {
-                using (new EditorGUILayout.HorizontalScope())
+                var members = group.ToList();
+                if (members.Count > 1) DrawCandidateGroupHeader(members);
+                foreach (var e in members)
                 {
-                    e.Selected = EditorGUILayout.Toggle(e.Selected, GUILayout.Width(36));
-
-                    if (GUILayout.Button(new GUIContent(e.UnitPath, e.UnitPath),
-                            EditorStyles.linkLabel, GUILayout.ExpandWidth(true)))
+                    using (new EditorGUILayout.HorizontalScope())
                     {
-                        PingPath(e.UnitPath);
-                    }
+                        bool rowSelected = EditorGUILayout.Toggle(e.Selected, GUILayout.Width(36));
+                        if (rowSelected != e.Selected)
+                            foreach (var member in members) member.Selected = rowSelected;
 
-                    GUILayout.Label(AknUtil.HumanSize(e.SizeBytes), GUILayout.Width(80));
-                    GUILayout.Label(new GUIContent(AknUtil.KindLabel(e.Kind), e.KindDetail), GUILayout.Width(80));
-                    GUILayout.Label(e.Reason, GUILayout.Width(140));
+                        string tooltip = e.UnitPath;
+                        if (e.ReferencedByUnits.Count > 0)
+                            tooltip += "\n\n" + string.Format(AknStrings.ScanReferencedByTooltipFormat,
+                                string.Join("\n", e.ReferencedByUnits));
+                        if (members.Count > 1) GUILayout.Space(16);
+                        if (GUILayout.Button(new GUIContent(e.UnitPath, tooltip),
+                                EditorStyles.linkLabel, GUILayout.ExpandWidth(true))) PingPath(e.UnitPath);
 
-                    if (GUILayout.Button(AknStrings.ScanProtectButton, GUILayout.Width(90)))
-                    {
-                        // このフォルダをホワイトリストにワンクリックで追加
-                        AddWhitelistGlob(e.UnitPath + "/**");
-                        AddWhitelistGlob(e.UnitPath);
-                        RunScan();
-                        GUIUtility.ExitGUI();
+                        GUILayout.Label(AknUtil.HumanSize(e.SizeBytes), GUILayout.Width(80));
+                        GUILayout.Label(new GUIContent(AknUtil.KindLabel(e.Kind), e.KindDetail), GUILayout.Width(80));
+                        GUILayout.Label(e.Reason, GUILayout.Width(140));
+
+                        if (GUILayout.Button(AknStrings.ScanProtectButton, GUILayout.Width(90)))
+                        {
+                            AddWhitelistGlob(e.UnitPath + "/**");
+                            AddWhitelistGlob(e.UnitPath);
+                            RunScan();
+                            GUIUtility.ExitGUI();
+                        }
                     }
                 }
             }
@@ -504,6 +579,49 @@ namespace Maaaaa.Akn.Editor
                 }
             }
 
+        }
+
+        private void DrawProtectedEntries()
+        {
+            if (_result.ProtectedEntries.Count == 0) return;
+            _protectedFoldout = EditorGUILayout.Foldout(_protectedFoldout,
+                string.Format(AknStrings.ScanProtectedFoldoutFormat, _result.ProtectedEntries.Count));
+            if (!_protectedFoldout) return;
+            EditorGUILayout.HelpBox(AknStrings.ScanProtectedHelp, MessageType.Info);
+            using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
+            {
+                GUILayout.Label(AknStrings.ScanColPath, GUILayout.ExpandWidth(true));
+                GUILayout.Label(AknStrings.ScanColCount, GUILayout.Width(70));
+                GUILayout.Label(AknStrings.ScanColSize, GUILayout.Width(80));
+                GUILayout.Label(AknStrings.ScanColReason, GUILayout.Width(220));
+            }
+            foreach (var e in _result.ProtectedEntries)
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button(new GUIContent(e.UnitPath, e.UnitPath), EditorStyles.linkLabel,
+                            GUILayout.ExpandWidth(true))) PingPath(e.UnitPath);
+                    GUILayout.Label(string.Format(AknStrings.ScanFileCountFormat, e.FileCount), GUILayout.Width(70));
+                    GUILayout.Label(AknUtil.HumanSize(e.SizeBytes), GUILayout.Width(80));
+                    GUILayout.Label(e.Reason, GUILayout.Width(220));
+                }
+            }
+        }
+
+        private void DrawCandidateGroupHeader(List<ScanResultEntry> members)
+        {
+            bool selected = members.Any(m => m.Selected);
+            long size = members.Sum(m => m.SizeBytes);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                bool newSelected = EditorGUILayout.ToggleLeft(string.Format(
+                    AknStrings.ScanGroupHeaderFormat, members.Count, AknUtil.HumanSize(size)), selected);
+                if (newSelected != selected) foreach (var member in members) member.Selected = newSelected;
+                bool hasToolOutput = members.Any(m => _settings.toolOutputDirectories.Any(o =>
+                    m.UnitPath == o || m.UnitPath.StartsWith(o.TrimEnd('/') + "/", System.StringComparison.Ordinal)));
+                EditorGUILayout.LabelField(hasToolOutput ? AknStrings.ScanGroupToolOutputHelp :
+                    AknStrings.ScanGroupGenericHelp, EditorStyles.wordWrappedMiniLabel);
+            }
         }
 
         private void Relocate(List<ScanResultEntry> selected, long selectedSize)
@@ -827,9 +945,10 @@ namespace Maaaaa.Akn.Editor
                 EditorGUILayout.LabelField(AknStrings.CacheTargetsHeader, EditorStyles.boldLabel);
                 foreach (var t in _cacheTargets.Where(t => t.Enabled))
                 {
-                    var size = t.SizeBytes >= 0 ? AknUtil.HumanSize(t.SizeBytes) : "未計測";
+                    var size = t.SizeBytes >= 0 ? AknUtil.HumanSize(t.SizeBytes) : AknStrings.CacheUnmeasured;
                     EditorGUILayout.LabelField(
-                        $"・{t.RelativePath}/   （{size}{(t.Exists ? "" : " / 無し")}）",
+                        string.Format(AknStrings.CacheTargetEntryFormat, t.RelativePath, size,
+                            t.Exists ? "" : AknStrings.CacheTargetMissing),
                         EditorStyles.miniLabel);
                 }
                 EditorGUILayout.LabelField(AknStrings.CacheTargetsCsprojNote, EditorStyles.miniLabel);

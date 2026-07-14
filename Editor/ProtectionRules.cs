@@ -67,9 +67,13 @@ namespace Maaaaa.Akn.Editor
             IReadOnlyList<string> whitelistGlobs,
             out string reason)
         {
-            // 本ツール自身の設定フォルダは常に保護（自己言及の回避）
+            // 本ツール自身の新旧設定フォルダは常に保護（自己言及の回避）
             if (unitPath == AknSettings.SettingsFolder ||
-                unitPath.StartsWith(AknSettings.SettingsFolder + "/"))
+                unitPath.StartsWith(AknSettings.SettingsFolder + "/") ||
+                unitPath == AknSettings.LegacySettingsFolder ||
+                unitPath.StartsWith(AknSettings.LegacySettingsFolder + "/") ||
+                containedFiles.Any(file =>
+                    file == AknSettings.SettingsPath || file == AknSettings.LegacySettingsPath))
             {
                 reason = "本ツールの設定フォルダ";
                 return true;

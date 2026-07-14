@@ -26,6 +26,8 @@ namespace Maaaaa.Akn.Editor
             "ここを取りこぼすと、使用中のアセットを誤って未使用と判定します。";
         public const string RootsDropArea = "ここにフォルダをドラッグ＆ドロップ";
         public const string RootsSelectFolder = "フォルダを選択して追加";
+        public const string AddButton = "追加";
+        public const string RootsInvalidIndividualAsset = "Prefab または Scene(.unity) を指定してください。";
         public const string RootsAddIndividualHeader = "個別ファイルをルートに追加（任意）";
         public const string RootsAddIndividualHelp =
             "ディレクトリ単位ではなく、単一の Prefab / Scene をルートに追加できます。";
@@ -33,9 +35,18 @@ namespace Maaaaa.Akn.Editor
         public const string RootsAutoDetectButton = "アバターを自動検出";
         public const string RootsAutoDetectNone = "自動検出されたアバターはありません（または VRChat SDK 未導入）。";
         public const string RootsAutoDetectExcludeHint = "チェックを外すとルートから除外されます。";
+        public const string RootsImplicitHeaderFormat = "暗黙ルート ({0})";
+        public const string RootsImplicitHeaderNotInspected = "暗黙ルート（未調査）";
+        public const string RootsImplicitInspect = "暗黙ルートを調べる";
+        public const string RootsImplicitHelp =
+            "ここに並んでいるものは、どこからも参照されていなくてもスキャンの起点として扱います。Resources 配下などは、参照が無くても実行時に読み込まれるためです。\n\n" +
+            "ツールの設定アセット（「最後に変換した衣装」などを覚えているもの）が含まれていると、変換元の衣装がいつまでも「使用中」と判定されます。心当たりがあれば、チェックを外して起点から除外してください。";
+        public const string RootsImplicitNotInspected = "「暗黙ルートを調べる」を押すと一覧を表示します。";
         public const string RemoveButton = "削除";
         public const string RootsUnregistered = "（未登録）";
         public const string AssetsFolderRequired = "Assets/ 配下のフォルダを選択してください。";
+        public const string FolderRequiredFormat = "フォルダを指定してください: {0}";
+        public const string RegisteredItemsFormat = "登録済み: {0} 件";
 
         // ---- Protection タブ ----
         public const string ProtHeader = "保護ルール";
@@ -43,6 +54,10 @@ namespace Maaaaa.Akn.Editor
             "以下に該当するフォルダ／ファイルは、参照されていなくても退避対象から除外されます。\n" +
             "判定に迷う場合は、誤って消してしまわないよう保護側に倒します。";
         public const string ProtStructureHeader = "構造ヒューリスティック保護（自動）";
+        public const string ProtStructureDetail =
+            "・.cs / .asmdef / .asmref / .dll / .shader / .hlsl / .cginc / .shadergraph を含む\n" +
+            "・package.json / *.vpm.json を含む\n" +
+            "・Editor/ ディレクトリを持つ";
         public const string ProtToolListHeader = "既知ツール名リスト（デフォルト保護）";
         public const string ProtExtHeader = "常に保護する拡張子";
         public const string ProtWhitelistHeader = "ユーザーホワイトリスト（glob）";
@@ -53,11 +68,20 @@ namespace Maaaaa.Akn.Editor
 
         // ---- Scan タブ ----
         public const string ScanScopeHeader = "スキャン範囲";
+        public const string ScanAutoGranularityToggle = "導入単位フォルダを自動推定する";
+        public const string ScanFixedDepthLabel = "固定深度:";
         public const string ScanScopeHelp =
             "範囲を指定しても、参照の解析は常にプロジェクト全体で行います。範囲外のアバターから使われているアセットが、範囲を絞ったせいで未使用と判定されることはありません。";
         public const string ScanScopeDropArea = "ここに対象フォルダをドラッグ＆ドロップ";
         public const string ScanScopeSelectFolder = "フォルダを選択して追加";
         public const string ScanScopeUnconfigured = "（未設定 — プロジェクト全体を対象）";
+        public const string ScanToolOutputHeader = "ツール出力フォルダ";
+        public const string ScanToolOutputHelp =
+            "衣装変換ツールなどが生成物を出すフォルダを登録します。中身をツール本体（スクリプトや DLL）と切り離して判定し、未使用の生成物を候補に出せるようにします。\n\n" +
+            "ツール本体そのものは登録後も保護されます。保護を外す設定ではありません。";
+        public const string ScanToolOutputDropArea = "ここにツール出力フォルダをドラッグ＆ドロップ";
+        public const string ScanToolOutputSelectFolder = "フォルダを選択して追加";
+        public const string ScanToolOutputUnconfigured = "（未設定）";
         public const string ScanScopeSummaryFormat = "スキャン範囲: {0}（範囲外 {1} 単位は判定していません）";
         public const string ScanScopeNoUnitsWarning =
             "指定した範囲に判定単位が1つもありません。指定したフォルダが、判定単位（導入単位フォルダ）より深い可能性があります。範囲をもう少し浅いフォルダにするか、判定粒度の設定を見直してください。";
@@ -72,6 +96,7 @@ namespace Maaaaa.Akn.Editor
         public const string ScanColType = "種別";
         public const string ScanColReason = "判定根拠";
         public const string ScanColProtect = "保護";
+        public const string ScanColCount = "件数";
         public const string ReasonUnreachable = "どのルートからも到達不能";
         public const string ScanProtectButton = "保護に追加";
         public const string ScanEmpty = "退避候補は見つかりませんでした。";
@@ -81,6 +106,16 @@ namespace Maaaaa.Akn.Editor
         public const string ScanSummaryFormat =
             "退避候補: {0} 件 / 合計 {1}   （使用中: {2} / 保護: {3} / ルート: {4} 件）";
         public const string ScanSelectedSummaryFormat = "選択中: {0} 件 / {1}";
+        public const string ScanProtectedFoldoutFormat = "保護された単位 ({0})";
+        public const string ScanProtectedHelp =
+            "ここに並んでいるものは、未使用でも候補に出しません。シェーダー・エディタ拡張・ツール本体・パッケージなど、退避すると壊れやすいものを自動で守っています。";
+        public const string ScanFileCountFormat = "{0} 件";
+        public const string ScanGroupHeaderFormat = "まとめて退避する必要があります（{0} 件・合計 {1}）";
+        public const string ScanGroupToolOutputHelp =
+            "ツールの出力物と、その元になったアセットのまとまりです。一部だけ退避すると、残ったほうが参照切れになります。";
+        public const string ScanGroupGenericHelp =
+            "互いに参照し合っている候補のまとまりです。一部だけ退避すると、残ったほうが参照切れになります。";
+        public const string ScanReferencedByTooltipFormat = "この候補を参照している候補:\n{0}";
 
         // ---- 退避 / 復元 ----
         public const string RelocateButton = "選択項目を退避（Move to Trash Folder）";
@@ -134,6 +169,7 @@ namespace Maaaaa.Akn.Editor
         public const string ProgressBuildReachable = "依存グラフを構築しています…";
         public const string ProgressEnumerate = "アセットを列挙しています…";
         public const string ProgressClassify = "判定しています…";
+        public const string ProgressBuildCandidateGroups = "候補間の参照関係を調べています…";
         public const string ProgressRelocate = "退避しています…";
         public const string ProgressRestore = "復元しています…";
         public const string ProgressMeasureCache = "キャッシュサイズを計測しています…";
@@ -234,6 +270,9 @@ namespace Maaaaa.Akn.Editor
         public const string CacheIncludeLogsToggle = "Logs/ も削除する（既定 OFF: 不具合調査に使う可能性があるため）";
         public const string CacheNextButton = "次へ（最終確認）";
         public const string CacheTargetsCsprojNote = "・*.csproj / *.sln （再生成されます）";
+        public const string CacheUnmeasured = "未計測";
+        public const string CacheTargetMissing = " / 無し";
+        public const string CacheTargetEntryFormat = "・{0}/   （{1}{2}）";
         public const string CacheFallbackDoneFormat =
             "clean-cache.bat をプロジェクトルートに生成しました:\n{0}\n\n" +
             "Unity を完全に終了してから、このバッチをダブルクリックで実行してください。";

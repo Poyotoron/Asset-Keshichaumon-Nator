@@ -17,6 +17,9 @@ namespace Maaaaa.Akn.Editor
         /// <summary>暗黙ルート（Resources 等）由来のルート。</summary>
         public readonly List<string> ImplicitRoots = new List<string>();
 
+        /// <summary>暗黙ルートの候補だったが、ユーザーが除外したもの。</summary>
+        public readonly List<string> ExcludedImplicitRoots = new List<string>();
+
         /// <summary>収集中に出たメッセージ（UI 表示用）。</summary>
         public readonly List<string> Messages = new List<string>();
 
@@ -84,10 +87,18 @@ namespace Maaaaa.Akn.Editor
             }
 
             // --- 暗黙ルート ---
-            CollectImplicitRoots(implicitRoots);
+            var excludedImplicit = new HashSet<string>(settings.excludedImplicitRoots ?? new List<string>());
+            var implicitCandidates = new HashSet<string>();
+            CollectImplicitRoots(implicitCandidates);
+            foreach (var p in implicitCandidates)
+            {
+                if (excludedImplicit.Contains(p)) set.ExcludedImplicitRoots.Add(p);
+                else implicitRoots.Add(p);
+            }
 
             set.AvatarRoots.AddRange(avatar.OrderBy(x => x));
             set.ImplicitRoots.AddRange(implicitRoots.OrderBy(x => x));
+            set.ExcludedImplicitRoots.Sort();
             set.AllRoots.AddRange(avatar);
             foreach (var p in implicitRoots)
             {
