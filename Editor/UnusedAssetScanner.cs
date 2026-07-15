@@ -16,6 +16,8 @@ namespace Maaaaa.Akn.Editor
     /// </summary>
     internal static class UnusedAssetScanner
     {
+        private const int ImplicitRootAttributionLimit = 200;
+
         public static ScanResult Scan(AknSettings settings, RootSet roots)
         {
             var result = new ScanResult
@@ -28,6 +30,12 @@ namespace Maaaaa.Akn.Editor
             EditorUtility.DisplayProgressBar(AknStrings.ProgressTitle, AknStrings.ProgressBuildReachable, 0.2f);
             var reachable = DependencyCache.GetReachable(roots.AllRoots);
 
+            // 説明表示にだけ使う。候補判定は従来どおり全ルートの reachable で行う。
+            EditorUtility.DisplayProgressBar(
+                AknStrings.ProgressTitle, AknStrings.ProgressBuildAvatarReachable, 0.3f);
+            var reachableAvatarOnly = new HashSet<string>(
+                AssetDatabase.GetDependencies(roots.AvatarRoots.ToArray(), true), StringComparer.Ordinal);
+
             // --- 全アセット列挙（Assets 配下のファイルのみ）---
             EditorUtility.DisplayProgressBar(AknStrings.ProgressTitle, AknStrings.ProgressEnumerate, 0.4f);
             var allFiles = new List<string>();
@@ -39,31 +47,42 @@ namespace Maaaaa.Akn.Editor
                 allFiles.Add(path);
             }
 
-            // --- 導入単位フォルダへ集約 ---
-            // ファイル単位モードでも、保護判定は「そのファイルが属する導入単位フォルダの中身」を
-            // 文脈として使う。これによりコード/シェーダーを含むフォルダ内の個別ファイルも保護され、
-            // 「迷ったら保護」の安全性を保ったまま列挙粒度だけを細かくできる。
+            // --- 判定単位と保護判定の文脈へ集約 ---
+            // ツール出力フォルダ内では判定単位をファイルまで細かくする一方、保護判定は
+            // 従来どおり出力フォルダ直下のエントリ全体を文脈として安全側に判定する。
             EditorUtility.DisplayProgressBar(AknStrings.ProgressTitle, AknStrings.ProgressClassify, 0.6f);
             var unitOf = new UnitResolver(settings, allFiles);
             var folderUnits = new Dictionary<string, List<string>>();
-            var folderUnitOf = new Dictionary<string, string>();
+            var protectionContexts = new Dictionary<string, List<string>>();
+            var protectionContextOf = new Dictionary<string, string>();
             foreach (var f in allFiles)
             {
                 var unit = unitOf.Resolve(f);
-                folderUnitOf[f] = unit;
+                var protectionContext = unitOf.ResolveProtectionContext(f);
+                protectionContextOf[f] = protectionContext;
                 if (!folderUnits.TryGetValue(unit, out var list))
                 {
                     list = new List<string>();
                     folderUnits[unit] = list;
                 }
                 list.Add(f);
+                if (!protectionContexts.TryGetValue(protectionContext, out var contextFiles))
+                {
+                    contextFiles = new List<string>();
+                    protectionContexts[protectionContext] = contextFiles;
+                }
+                contextFiles.Add(f);
             }
 
             var whitelist = settings.userWhitelistGlobs;
+            var excludedImplicitRoots = new HashSet<string>(
+                roots.ExcludedImplicitRoots ?? new List<string>(), StringComparer.Ordinal);
+            var implicitRoots = new HashSet<string>(roots.ImplicitRoots, StringComparer.Ordinal);
+            var protectedByUnit = new Dictionary<string, ProtectedUnitEntry>();
+            var implicitOnlyUsedByUnit = new Dictionary<string, ImplicitOnlyUsedEntry>();
 
             if (settings.fileUnitMode)
             {
-                var protectedByUnit = new Dictionary<string, ProtectedUnitEntry>();
                 int fi = 0;
                 foreach (var f in allFiles)
                 {
@@ -81,37 +100,64 @@ namespace Maaaaa.Akn.Editor
                     }
 
                     result.TotalUnits++;
-                    if (reachable.Contains(f)) { result.UsedUnits++; continue; }
-
-                    // 保護文脈 = このファイルが属する導入単位フォルダの中身
-                    var ctxFiles = folderUnits[folderUnitOf[f]];
-                    if (ProtectionRules.IsProtectedUnit(f, ctxFiles, whitelist, out var reason))
+                    if (reachable.Contains(f))
                     {
-                        result.ProtectedCount++;
-                        var unitPath = folderUnitOf[f];
-                        if (!protectedByUnit.TryGetValue(unitPath, out var entry))
+                        if (reachableAvatarOnly.Contains(f))
                         {
-                            entry = new ProtectedUnitEntry { UnitPath = unitPath, Reason = reason };
-                            protectedByUnit[unitPath] = entry;
+                            result.UsedUnits++;
+                            continue;
                         }
-                        entry.FileCount++;
-                        entry.SizeBytes += AknUtil.FileSize(f);
+
+                        var usedContextPath = protectionContextOf[f];
+                        var usedContextFiles = protectionContexts[usedContextPath];
+                        var usedProtectionPath = unitOf.IsInToolOutput(f) ? usedContextPath : f;
+                        if (ProtectionRules.IsProtectedUnit(
+                                usedProtectionPath, usedContextFiles, whitelist, out var usedReason))
+                        {
+                            result.ProtectedCount++;
+                            AddProtectedEntry(
+                                protectedByUnit, usedContextPath, usedReason, f, false);
+                        }
+                        else if (implicitRoots.Contains(f))
+                        {
+                            result.ProtectedCount++;
+                            AddProtectedEntry(protectedByUnit, usedContextPath,
+                                AknStrings.ReasonImplicitRoot, f, false);
+                        }
+                        else
+                        {
+                            result.UsedUnits++;
+                            AddImplicitOnlyUsedEntry(
+                                implicitOnlyUsedByUnit, usedContextPath, new[] { f });
+                        }
                         continue;
                     }
 
-                    var single = new List<string> { f };
+                    var unitFiles = new List<string> { f };
+                    var contextPath = protectionContextOf[f];
+                    var ctxFiles = protectionContexts[contextPath];
+                    bool excludedRoot = ProtectionRules.IsExcludedRootUnit(
+                        unitFiles, excludedImplicitRoots, out var reason);
+                    var protectionPath = unitOf.IsInToolOutput(f) ? contextPath : f;
+                    if (excludedRoot ||
+                        ProtectionRules.IsProtectedUnit(protectionPath, ctxFiles, whitelist, out reason))
+                    {
+                        result.ProtectedCount++;
+                        AddProtectedEntry(protectedByUnit, contextPath, reason, f, excludedRoot);
+                        continue;
+                    }
+
                     result.Candidates.Add(new ScanResultEntry
                     {
                         UnitPath = f,
-                        ContainedFiles = single,
+                        ContainedFiles = unitFiles,
                         SizeBytes = AknUtil.FileSize(f),
-                        Kind = ComputeKind(single, out var kd),
+                        Kind = ComputeKind(unitFiles, out var kd),
                         KindDetail = kd,
                         Reason = AknStrings.ReasonUnreachable,
                         Selected = false,
                     });
                 }
-                result.ProtectedEntries.AddRange(protectedByUnit.Values);
             }
             else
             {
@@ -137,19 +183,49 @@ namespace Maaaaa.Akn.Editor
                     result.TotalUnits++;
 
                     // 使用中: フォルダ内に到達アセットが1つでもあれば使用中とみなす
-                    if (files.Any(f => reachable.Contains(f))) { result.UsedUnits++; continue; }
+                    if (files.Any(f => reachable.Contains(f)))
+                    {
+                        if (files.Any(f => reachableAvatarOnly.Contains(f)))
+                        {
+                            result.UsedUnits++;
+                            continue;
+                        }
 
-                    // 保護
-                    if (ProtectionRules.IsProtectedUnit(unitPath, files, whitelist, out var reason))
+                        var usedContextPath = protectionContextOf[files[0]];
+                        var usedContextFiles = protectionContexts[usedContextPath];
+                        if (ProtectionRules.IsProtectedUnit(
+                                usedContextPath, usedContextFiles, whitelist, out var usedReason))
+                        {
+                            result.ProtectedCount++;
+                            foreach (var file in files)
+                                AddProtectedEntry(
+                                    protectedByUnit, usedContextPath, usedReason, file, false);
+                        }
+                        else if (files.Any(implicitRoots.Contains))
+                        {
+                            result.ProtectedCount++;
+                            foreach (var file in files)
+                                AddProtectedEntry(protectedByUnit, usedContextPath,
+                                    AknStrings.ReasonImplicitRoot, file, false);
+                        }
+                        else
+                        {
+                            result.UsedUnits++;
+                            AddImplicitOnlyUsedEntry(implicitOnlyUsedByUnit, unitPath, files);
+                        }
+                        continue;
+                    }
+
+                    var contextPath = protectionContextOf[files[0]];
+                    var ctxFiles = protectionContexts[contextPath];
+                    bool excludedRoot = ProtectionRules.IsExcludedRootUnit(
+                        files, excludedImplicitRoots, out var reason);
+                    if (excludedRoot ||
+                        ProtectionRules.IsProtectedUnit(contextPath, ctxFiles, whitelist, out reason))
                     {
                         result.ProtectedCount++;
-                        result.ProtectedEntries.Add(new ProtectedUnitEntry
-                        {
-                            UnitPath = unitPath,
-                            Reason = reason,
-                            FileCount = files.Count,
-                            SizeBytes = files.Sum(AknUtil.FileSize),
-                        });
+                        foreach (var file in files)
+                            AddProtectedEntry(protectedByUnit, contextPath, reason, file, excludedRoot);
                         continue;
                     }
 
@@ -166,10 +242,79 @@ namespace Maaaaa.Akn.Editor
                 }
             }
 
+            result.ProtectedEntries.AddRange(protectedByUnit.Values);
+            result.ImplicitOnlyUsedEntries.AddRange(implicitOnlyUsedByUnit.Values);
+            AssignImplicitRoots(result, roots);
+
             BuildCandidateGroups(result.Candidates);
             SortCandidateGroups(result.Candidates);
             result.ProtectedEntries.Sort((a, b) => b.SizeBytes.CompareTo(a.SizeBytes));
+            result.ImplicitOnlyUsedEntries.Sort((a, b) => b.SizeBytes.CompareTo(a.SizeBytes));
             return result;
+        }
+
+        private static void AddImplicitOnlyUsedEntry(
+            IDictionary<string, ImplicitOnlyUsedEntry> entries,
+            string unitPath,
+            IEnumerable<string> files)
+        {
+            if (!entries.TryGetValue(unitPath, out var entry))
+            {
+                entry = new ImplicitOnlyUsedEntry { UnitPath = unitPath };
+                entries[unitPath] = entry;
+            }
+            foreach (var file in files)
+            {
+                entry.ContainedFiles.Add(file);
+                entry.FileCount++;
+                entry.SizeBytes += AknUtil.FileSize(file);
+            }
+        }
+
+        private static void AssignImplicitRoots(ScanResult result, RootSet roots)
+        {
+            if (result.ImplicitOnlyUsedEntries.Count == 0) return;
+            if (roots.ImplicitRoots.Count > ImplicitRootAttributionLimit)
+            {
+                result.ImplicitRootAttributionSkipped = true;
+                return;
+            }
+
+            for (int i = 0; i < roots.ImplicitRoots.Count; i++)
+            {
+                EditorUtility.DisplayProgressBar(
+                    AknStrings.ProgressTitle, AknStrings.ProgressAssignImplicitRoots,
+                    (float)i / Math.Max(1, roots.ImplicitRoots.Count));
+                var implicitRoot = roots.ImplicitRoots[i];
+                var reachableFromRoot = new HashSet<string>(
+                    AssetDatabase.GetDependencies(new[] { implicitRoot }, true), StringComparer.Ordinal);
+                foreach (var entry in result.ImplicitOnlyUsedEntries)
+                {
+                    if (entry.ContainedFiles.Any(reachableFromRoot.Contains))
+                        entry.PinnedByImplicitRoots.Add(implicitRoot);
+                }
+            }
+        }
+
+        private static void AddProtectedEntry(
+            IDictionary<string, ProtectedUnitEntry> protectedByUnit,
+            string contextPath,
+            string reason,
+            string file,
+            bool excludedRoot)
+        {
+            if (!protectedByUnit.TryGetValue(contextPath, out var entry))
+            {
+                entry = new ProtectedUnitEntry { UnitPath = contextPath, Reason = reason };
+                protectedByUnit[contextPath] = entry;
+            }
+            else if (excludedRoot)
+            {
+                // 起点から外したというユーザー操作を、最も説明的な保護理由として優先する。
+                entry.Reason = reason;
+            }
+            entry.FileCount++;
+            entry.SizeBytes += AknUtil.FileSize(file);
         }
 
         private static void BuildCandidateGroups(List<ScanResultEntry> candidates)
@@ -302,6 +447,14 @@ namespace Maaaaa.Akn.Editor
 
         public string Resolve(string assetPath)
         {
+            if (IsInToolOutput(assetPath)) return assetPath;
+            return _settings.autoEstimateGranularity
+                ? ResolveAuto(assetPath)
+                : ResolveFixedDepth(assetPath, _settings.granularityDepth);
+        }
+
+        public string ResolveProtectionContext(string assetPath)
+        {
             foreach (var output in _toolOutputDirectories)
             {
                 var prefix = output.TrimEnd('/') + "/";
@@ -313,6 +466,12 @@ namespace Maaaaa.Akn.Editor
             return _settings.autoEstimateGranularity
                 ? ResolveAuto(assetPath)
                 : ResolveFixedDepth(assetPath, _settings.granularityDepth);
+        }
+
+        public bool IsInToolOutput(string assetPath)
+        {
+            return _toolOutputDirectories.Any(output => assetPath.StartsWith(
+                output.TrimEnd('/') + "/", StringComparison.Ordinal));
         }
 
         private static string ResolveFixedDepth(string assetPath, int depth)

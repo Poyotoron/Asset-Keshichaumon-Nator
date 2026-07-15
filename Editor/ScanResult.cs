@@ -56,6 +56,16 @@ namespace Maaaaa.Akn.Editor
         public long SizeBytes;
     }
 
+    /// <summary>アバター系ルートからは到達せず、暗黙ルートだけで使用中になっている単位。</summary>
+    internal class ImplicitOnlyUsedEntry
+    {
+        public string UnitPath;
+        public List<string> ContainedFiles = new List<string>();
+        public int FileCount;
+        public long SizeBytes;
+        public List<string> PinnedByImplicitRoots = new List<string>();
+    }
+
     /// <summary>スキャン結果全体。</summary>
     internal class ScanResult
     {
@@ -66,6 +76,8 @@ namespace Maaaaa.Akn.Editor
         public int ProtectedCount;
         public List<ProtectedUnitEntry> ProtectedEntries = new List<ProtectedUnitEntry>();
         public int ProtectedUnits => ProtectedEntries.Count;
+        public List<ImplicitOnlyUsedEntry> ImplicitOnlyUsedEntries = new List<ImplicitOnlyUsedEntry>();
+        public bool ImplicitRootAttributionSkipped;
         /// <summary>スキャン範囲の外だったため、判定せずに除外した単位の数。</summary>
         public int OutOfScopeUnits;
         public int RootCount;

@@ -17,6 +17,7 @@ namespace Maaaaa.Akn.Editor
         public const string TabScan = "スキャン結果 (Scan Result)";
         public const string TabDuplicates = "重複検出 (Duplicates)";
         public const string TabCache = "キャッシュ掃除 (Cache)";
+        public const string TabAbout = "情報 (About)";
 
         // ---- Roots タブ ----
         public const string RootsHeader = "アバタールートディレクトリ";
@@ -40,7 +41,9 @@ namespace Maaaaa.Akn.Editor
         public const string RootsImplicitInspect = "暗黙ルートを調べる";
         public const string RootsImplicitHelp =
             "ここに並んでいるものは、どこからも参照されていなくてもスキャンの起点として扱います。Resources 配下などは、参照が無くても実行時に読み込まれるためです。\n\n" +
-            "ツールの設定アセット（「最後に変換した衣装」などを覚えているもの）が含まれていると、変換元の衣装がいつまでも「使用中」と判定されます。心当たりがあれば、チェックを外して起点から除外してください。";
+            "ツールの設定アセット（「最後に変換した衣装」などを覚えているもの）が含まれていると、変換元の衣装がいつまでも「使用中」と判定されます。心当たりがあれば、チェックを外して起点から除外してください。\n\n" +
+            "チェックを外したファイル自身は退避候補にならず、保護されます。外れるのは、そこからの参照を起点として扱うことだけです。\n\n" +
+            "ただし、そのファイルが参照していたアセットを退避すると、ツールの入力欄は空になります（参照が切れます）。それが困る場合は、そのアセットを退避しないでください。";
         public const string RootsImplicitNotInspected = "「暗黙ルートを調べる」を押すと一覧を表示します。";
         public const string RemoveButton = "削除";
         public const string RootsUnregistered = "（未登録）";
@@ -67,6 +70,10 @@ namespace Maaaaa.Akn.Editor
         public const string ProtWhitelistPlaceholder = "Assets/…/**";
 
         // ---- Scan タブ ----
+        public const string ScanTargetsFoldout = "スキャン範囲・対象";
+        public const string ScanOptionsFoldout = "判定オプション";
+        public const string ScanExecuteHeader = "スキャン実行";
+        public const string ScanResultsHeader = "スキャン結果";
         public const string ScanScopeHeader = "スキャン範囲";
         public const string ScanAutoGranularityToggle = "導入単位フォルダを自動推定する";
         public const string ScanFixedDepthLabel = "固定深度:";
@@ -98,6 +105,8 @@ namespace Maaaaa.Akn.Editor
         public const string ScanColProtect = "保護";
         public const string ScanColCount = "件数";
         public const string ReasonUnreachable = "どのルートからも到達不能";
+        public const string ReasonExcludedImplicitRoot = "起点から除外したファイルを含むため保護";
+        public const string ReasonImplicitRoot = "スキャンの起点（暗黙ルート）として扱っているため保護";
         public const string ScanProtectButton = "保護に追加";
         public const string ScanEmpty = "退避候補は見つかりませんでした。";
         public const string ScanNotRunYet = "まだスキャンしていません。「スキャン実行」を押してください。";
@@ -109,13 +118,49 @@ namespace Maaaaa.Akn.Editor
         public const string ScanProtectedFoldoutFormat = "保護された単位 ({0})";
         public const string ScanProtectedHelp =
             "ここに並んでいるものは、未使用でも候補に出しません。シェーダー・エディタ拡張・ツール本体・パッケージなど、退避すると壊れやすいものを自動で守っています。";
+        public const string ScanImplicitOnlyFoldoutFormat = "暗黙ルートだけで使用中 ({0})";
+        public const string ScanImplicitOnlyHelp =
+            "ここに並んでいるものは、アバターやシーンからは参照されていません。設定アセットなどの「暗黙ルート」だけが起点になって「使用中」と判定されています。意図しない場合は、その起点を外すと退避候補に出るようになります。";
+        public const string ScanColImplicitRoots = "生かしている暗黙ルート";
+        public const string ScanExcludeImplicitRoots = "起点から外す";
+        public const string ScanImplicitRootsAttributionSkipped =
+            "暗黙ルートのいずれか（件数が多いため、Roots タブで確認してください）";
+        public const string ScanImplicitRootsNotIdentified =
+            "暗黙ルートを特定できません（Roots タブで確認してください）";
         public const string ScanFileCountFormat = "{0} 件";
         public const string ScanGroupHeaderFormat = "まとめて退避する必要があります（{0} 件・合計 {1}）";
         public const string ScanGroupToolOutputHelp =
             "ツールの出力物と、その元になったアセットのまとまりです。一部だけ退避すると、残ったほうが参照切れになります。";
         public const string ScanGroupGenericHelp =
             "互いに参照し合っている候補のまとまりです。一部だけ退避すると、残ったほうが参照切れになります。";
+        public const string ScanGroupSourceAsset = "元アセット";
+        public const string ScanGroupGeneratedAsset = "生成物";
         public const string ScanReferencedByTooltipFormat = "この候補を参照している候補:\n{0}";
+
+        // ---- About タブ ----
+        public const string AboutPackageFormat = "{0}  {1}";
+        public const string AboutUnknownVersion = "バージョン不明";
+        public const string AboutIssuesHeader = "バグ報告・要望・誤検出の報告";
+        public const string AboutIssuesHelp =
+            "バグ報告・要望・誤検出の報告は GitHub の Issue へお願いします。\n\n" +
+            "とくに「使っているアセットなのに退避候補に出た」というケースは、最優先で知りたい報告です。心当たりがあれば、退避せずにそのまま報告してください。";
+        public const string AboutOpenIssues = "GitHub Issues を開く";
+        public const string AboutIssuesUrl = "https://github.com/Poyotoron/Asset-Keshichaumon-Nator/issues";
+        public const string AboutLinksHeader = "リンク";
+        public const string AboutRepository = "リポジトリ";
+        public const string AboutRepositoryUrl = "https://github.com/Poyotoron/Asset-Keshichaumon-Nator";
+        public const string AboutChangelog = "変更履歴 (CHANGELOG)";
+        public const string AboutChangelogUrl = "https://github.com/Poyotoron/Asset-Keshichaumon-Nator/blob/main/CHANGELOG.md";
+        public const string AboutLicense = "ライセンス: MIT";
+        public const string AboutReportInfoHeader = "報告に添えてほしい情報";
+        public const string AboutReportInfo =
+            "・このツールのバージョン\n" +
+            "・Unity のバージョン\n" +
+            "・スキャン結果に表示された判定根拠、または保護理由\n" +
+            "・対象アセットのフォルダ構成";
+        public const string AboutCopyInfo = "環境情報をコピー";
+        public const string AboutCopyPreview = "この環境情報がコピーされます:";
+        public const string AboutCopyFormat = "- ツール: {0} {1}\n- Unity: {2}\n- OS: {3}";
 
         // ---- 退避 / 復元 ----
         public const string RelocateButton = "選択項目を退避（Move to Trash Folder）";
@@ -167,6 +212,8 @@ namespace Maaaaa.Akn.Editor
         public const string ProgressTitle = "スキャン中…";
         public const string ProgressCollectRoots = "ルート集合を収集しています…";
         public const string ProgressBuildReachable = "依存グラフを構築しています…";
+        public const string ProgressBuildAvatarReachable = "アバターとシーンからの到達を調べています…";
+        public const string ProgressAssignImplicitRoots = "使用中にしている暗黙ルートを調べています…";
         public const string ProgressEnumerate = "アセットを列挙しています…";
         public const string ProgressClassify = "判定しています…";
         public const string ProgressBuildCandidateGroups = "候補間の参照関係を調べています…";

@@ -55,6 +55,27 @@ namespace Maaaaa.Akn.Editor
         }
 
         /// <summary>
+        /// 判定単位が「起点から除外されたファイル」を含むか。含むなら保護する。
+        /// 起点から外す操作は「そこからの参照を無視する」ためのものであり、
+        /// そのファイル自身を消すためのものではない。
+        /// </summary>
+        public static bool IsExcludedRootUnit(
+            IReadOnlyList<string> unitFiles,
+            ICollection<string> excludedImplicitRoots,
+            out string reason)
+        {
+            if (excludedImplicitRoots != null &&
+                unitFiles.Any(file => excludedImplicitRoots.Contains(file)))
+            {
+                reason = AknStrings.ReasonExcludedImplicitRoot;
+                return true;
+            }
+
+            reason = null;
+            return false;
+        }
+
+        /// <summary>
         /// 導入単位フォルダを保護すべきか判定する。
         /// </summary>
         /// <param name="unitPath">導入単位フォルダのアセットパス。</param>
