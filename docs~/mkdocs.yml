@@ -7,6 +7,8 @@ theme:
   name: material
   language: ja
   custom_dir: overrides
+  # サイト共通のファビコン。実体は www.maaaaa.net 側にあり、そちらを差し替えれば全ツールに反映される
+  favicon: https://www.maaaaa.net/favicon.png
   features:
     - navigation.sections
     - navigation.expand
