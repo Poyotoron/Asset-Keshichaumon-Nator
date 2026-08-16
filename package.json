@@ -10,7 +10,7 @@
     "url": "https://github.com/Poyotoron"
   },
   "url": "https://github.com/Poyotoron/Asset-Keshichaumon-Nator/releases/download/0.3.3/net.maaaaa.asset-keshichaumon-nator-0.3.3.zip",
-  "documentationUrl": "https://poyotoron.github.io/Asset-Keshichaumon-Nator/",
+  "documentationUrl": "https://docs.maaaaa.net/Asset-Keshichaumon-Nator/",
   "vpmDependencies": {
     "com.vrchat.avatars": ">=3.7.0"
   },
