@@ -1,0 +1,61 @@
+site_name: いらないアセット消しちゃうもんネーター
+site_url: https://poyotoron.github.io/Asset-Keshichaumon-Nator/
+repo_url: https://github.com/Poyotoron/Asset-Keshichaumon-Nator
+site_dir: site
+
+theme:
+  name: material
+  language: ja
+  custom_dir: overrides
+  features:
+    - navigation.sections
+    - navigation.expand
+    - toc.follow
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: ダークテーマに切り替える
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: ライトテーマに切り替える
+
+plugins:
+  - search:
+      lang: ja
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - tables
+  - toc:
+      permalink: true
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  akn_version: !ENV [AKN_VERSION, dev]
+
+nav:
+  - はじめに: index.md
+  - インストール: install.md
+  - クイックスタート: quickstart.md
+  - ルートの設定: roots.md
+  - スキャンと退避: scan.md
+  - 保護のしくみ: protection.md
+  - 重複アセットの検出: duplicates.md
+  - キャッシュ掃除: cache.md
+  - 困ったときは: troubleshooting.md
+  - 更新履歴: changelog.md
